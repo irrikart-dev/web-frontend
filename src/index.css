@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+
+/*
+ * Brand tokens mirror `lib/core/theme/tokens/color_tokens.dart` in the mobile
+ * app — the greens and blues are pixel-sampled from the client's droplet mark.
+ * Keep the two files in step when the palette changes.
+ */
+@theme {
+  --color-brand-50: #eef8eb;
+  --color-brand-100: #d5edcd;
+  --color-brand-200: #b8e0ac;
+  --color-brand-300: #9ad388;
+  --color-brand-400: #83c96c;
+  --color-brand-500: #67bd50;
+  --color-brand-600: #5cab47;
+  --color-brand-700: #4e953c;
+  --color-brand-800: #418032;
+  --color-brand-900: #2c5e20;
+
+  --color-water-400: #4fcbfa;
+  --color-water-500: #00afef;
+  --color-water-600: #0089bc;
+
+  --color-ink-900: #14171a;
+  --color-ink-700: #43464a;
+  --color-ink-500: #72757a;
+  --color-ink-300: #a1a3a6;
+  --color-ink-100: #e7e8e9;
+  --color-ink-50: #f3f3f4;
+
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-ink-50 text-ink-900 font-sans;
+  }
+}
+
+/*
+ * Shared control styles. Declared with `@utility` (not a plain class in
+ * @layer components) so that `@apply btn` composes in Tailwind v4.
+ */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: --spacing(2);
+  border-radius: var(--radius-lg);
+  padding: --spacing(2) --spacing(4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: 150ms;
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm
+           outline-none transition placeholder:text-ink-300
+           focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20
+           disabled:cursor-not-allowed disabled:bg-ink-50;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-semibold tracking-wide text-ink-700 uppercase;
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
+  }
+  .btn-ghost {
+    @apply btn border border-ink-100 bg-white text-ink-700 hover:bg-ink-50;
+  }
+  .btn-danger {
+    @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
+  }
+  .card {
+    @apply rounded-xl border border-ink-100 bg-white shadow-sm;
+  }
+}
