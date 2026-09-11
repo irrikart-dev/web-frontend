@@ -1,46 +1,43 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { IconPlus, IconTrash } from '../components/icons';
-import { ApiError, api, imageSrc } from '../lib/api';
-import { formatMoney } from '../lib/format';
+import { Dropzone } from '../components/Dropzone';
+import { Field, ListEditor, Toggle } from '../components/form';
+import { ImageThumbnail } from '../components/ImageThumbnail';
+import { ApiError, api, imageSrc, resolveAssetUrl, uploadImage } from '../lib/api';
+import { getCategories } from '../lib/categories';
 import type { Category, Product, Spec } from '../lib/types';
 
 interface FormState {
   name: string;
   sku: string;
-  slug: string;
   category: string;
   tagline: string;
   description: string;
   unit: string;
-  mrp: string;
   price: string;
   stockQty: string;
   imageUrl: string;
   features: string[];
   specs: Spec[];
   inStock: boolean;
-  featured: boolean;
   active: boolean;
 }
 
 const EMPTY: FormState = {
   name: '',
   sku: '',
-  slug: '',
   category: '',
   tagline: '',
   description: '',
   unit: 'piece',
-  mrp: '',
   price: '',
   stockQty: '0',
   imageUrl: '',
   features: [],
   specs: [],
   inStock: true,
-  featured: false,
   active: true,
 };
 
@@ -59,12 +56,34 @@ export function ProductFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Picking a file only swaps the local preview — it doesn't touch storage.
+  // The file is uploaded once, on submit, so re-picking never orphans images.
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  function onFile(file: File) {
+    setUploadError(null);
+    setImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setImageFile(file);
+  }
 
   useEffect(() => {
-    api<{ data: Category[] }>('/admin/categories')
-      .then((r) => {
-        setCategories(r.data);
-        setForm((f) => (f.category ? f : { ...f, category: r.data[0]?.id ?? '' }));
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  useEffect(() => {
+    getCategories()
+      .then((cats) => {
+        setCategories(cats);
+        setForm((f) => (f.category ? f : { ...f, category: cats[0]?.id ?? '' }));
       })
       .catch((e) => setError((e as Error).message));
   }, []);
@@ -78,19 +97,16 @@ export function ProductFormPage() {
         setForm({
           name: p.name,
           sku: p.sku,
-          slug: p.slug,
           category: p.category,
           tagline: p.tagline,
           description: p.description,
           unit: p.unit,
-          mrp: String(p.mrp),
           price: String(p.price),
           stockQty: String(p.stockQty),
           imageUrl: p.imageUrl ?? '',
           features: p.features,
           specs: p.specs,
           inStock: p.inStock,
-          featured: p.featured,
           active: p.active,
         });
       })
@@ -101,36 +117,41 @@ export function ProductFormPage() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const discount = useMemo(() => {
-    const mrp = Number(form.mrp);
-    const price = Number(form.price);
-    if (!mrp || price >= mrp) return 0;
-    return Math.round(((mrp - price) / mrp) * 100);
-  }, [form.mrp, form.price]);
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     setFieldErrors({});
 
+    let imageUrl = form.imageUrl.trim() || null;
+    if (imageFile) {
+      setUploading(true);
+      try {
+        imageUrl = await uploadImage(imageFile);
+      } catch (err) {
+        setUploadError(err instanceof ApiError ? err.message : 'Upload failed.');
+        setSaving(false);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
     const payload = {
       name: form.name.trim(),
-      // Blank SKU on create means "derive one from the slug" (backend does it).
+      // Blank SKU means "derive one from the name" — the backend does it, and the
+      // URL slug is always auto-derived from the name too, never user-set.
       ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
-      ...(form.slug.trim() ? { slug: form.slug.trim() } : {}),
       category: form.category,
       tagline: form.tagline.trim(),
       description: form.description.trim(),
       unit: form.unit,
-      mrp: Number(form.mrp),
       price: Number(form.price),
       stockQty: Number(form.stockQty),
-      imageUrl: form.imageUrl.trim() || null,
+      imageUrl,
       features: form.features.map((f) => f.trim()).filter(Boolean),
       specs: form.specs.filter((s) => s.label.trim() && s.value.trim()),
       inStock: form.inStock,
-      featured: form.featured,
       active: form.active,
     };
 
@@ -144,7 +165,10 @@ export function ProductFormPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
-        setFieldErrors(err.fields ?? {});
+        const fieldErrors = err.details?.fieldErrors ?? {};
+        setFieldErrors(
+          Object.fromEntries(Object.entries(fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])),
+        );
       } else {
         setError('Could not save the product.');
       }
@@ -155,7 +179,8 @@ export function ProductFormPage() {
 
   if (loading) return <p className="text-sm text-ink-500">Loading product...</p>;
 
-  const preview = form.imageUrl.trim() || (existing ? imageSrc(existing) : null);
+  const preview =
+    imagePreview || resolveAssetUrl(form.imageUrl.trim()) || (existing ? imageSrc(existing) : null);
 
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-5xl space-y-5">
@@ -193,7 +218,7 @@ export function ProductFormPage() {
           <section className="card space-y-4 p-5">
             <h3 className="text-sm font-bold text-ink-900">Basics</h3>
 
-            <Field label="Product name" error={fieldErrors.name}>
+            <Field label="Product name" error={fieldErrors.name} required>
               <input
                 className="field"
                 value={form.name}
@@ -216,7 +241,7 @@ export function ProductFormPage() {
                   placeholder="IK-HAN-MIN"
                 />
               </Field>
-              <Field label="Category" error={fieldErrors.category}>
+              <Field label="Category" error={fieldErrors.category} required>
                 <select
                   className="field"
                   value={form.category}
@@ -231,19 +256,6 @@ export function ProductFormPage() {
                 </select>
               </Field>
             </div>
-
-            <Field
-              label="URL slug"
-              error={fieldErrors.slug}
-              hint={isNew ? 'Leave blank to derive from the name' : undefined}
-            >
-              <input
-                className="field font-mono"
-                value={form.slug}
-                onChange={(e) => set('slug', e.target.value)}
-                placeholder="hans-mini"
-              />
-            </Field>
 
             <Field label="Tagline" error={fieldErrors.tagline}>
               <input
@@ -269,6 +281,7 @@ export function ProductFormPage() {
             <ListEditor
               values={form.features}
               placeholder="Anti-clog arrow design"
+              addLabel="Add feature"
               onChange={(features) => set('features', features)}
             />
           </section>
@@ -285,41 +298,16 @@ export function ProductFormPage() {
         <div className="space-y-5">
           <section className="card space-y-4 p-5">
             <h3 className="text-sm font-bold text-ink-900">Pricing</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="MRP" error={fieldErrors.mrp}>
-                <input
-                  className="field"
-                  type="number"
-                  min={0}
-                  value={form.mrp}
-                  onChange={(e) => set('mrp', e.target.value)}
-                  required
-                />
-              </Field>
-              <Field label="Selling price" error={fieldErrors.price}>
-                <input
-                  className="field"
-                  type="number"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => set('price', e.target.value)}
-                  required
-                />
-              </Field>
-            </div>
-            <div className="rounded-lg bg-ink-50 px-3 py-2.5 text-sm">
-              {discount > 0 ? (
-                <p className="text-ink-700">
-                  Customer sees{' '}
-                  <span className="font-semibold text-ink-900">
-                    {formatMoney(Number(form.price) || 0)}
-                  </span>{' '}
-                  <span className="text-brand-600">({discount}% off)</span>
-                </p>
-              ) : (
-                <p className="text-ink-500">No discount shown at this price.</p>
-              )}
-            </div>
+            <Field label="Selling price" error={fieldErrors.price} required>
+              <input
+                className="field"
+                type="number"
+                min={0}
+                value={form.price}
+                onChange={(e) => set('price', e.target.value)}
+                required
+              />
+            </Field>
             <Field label="Pack unit">
               <select className="field" value={form.unit} onChange={(e) => set('unit', e.target.value)}>
                 {UNITS.map((u) => (
@@ -349,12 +337,6 @@ export function ProductFormPage() {
               onChange={(v) => set('inStock', v)}
             />
             <Toggle
-              label="Featured"
-              hint="Leads the app home screen"
-              checked={form.featured}
-              onChange={(v) => set('featured', v)}
-            />
-            <Toggle
               label="Live"
               hint="Unchecked hides it from the app entirely"
               checked={form.active}
@@ -362,123 +344,16 @@ export function ProductFormPage() {
             />
           </section>
 
-          <section className="card space-y-4 p-5">
+          <section className="card space-y-3 p-5">
             <h3 className="text-sm font-bold text-ink-900">Image</h3>
-            <Field
-              label="Image URL"
-              error={fieldErrors.imageUrl}
-              hint="Direct link to a square product photo. Uploads land in a later phase."
-            >
-              <input
-                className="field"
-                type="url"
-                value={form.imageUrl}
-                onChange={(e) => set('imageUrl', e.target.value)}
-                placeholder="https://..."
-              />
-            </Field>
-            <div className="aspect-square w-full overflow-hidden rounded-lg border border-ink-100 bg-ink-50">
-              {preview ? (
-                <img src={preview} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs text-ink-300">
-                  No image yet
-                </div>
-              )}
-            </div>
+            <ImageThumbnail src={preview} />
+            <Dropzone uploading={uploading} onFile={onFile} />
+            {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+            {fieldErrors.imageUrl && <p className="text-xs text-red-600">{fieldErrors.imageUrl}</p>}
           </section>
         </div>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  error,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="label">{label}</label>
-      {children}
-      {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
-      ) : hint ? (
-        <p className="mt-1 text-xs text-ink-300">{hint}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function Toggle({
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 accent-brand-500"
-      />
-      <span className="leading-tight">
-        <span className="block text-sm font-medium text-ink-900">{label}</span>
-        <span className="block text-xs text-ink-300">{hint}</span>
-      </span>
-    </label>
-  );
-}
-
-/** Repeating single-line inputs (feature bullets). */
-function ListEditor({
-  values,
-  placeholder,
-  onChange,
-}: {
-  values: string[];
-  placeholder: string;
-  onChange: (v: string[]) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      {values.map((value, i) => (
-        <div key={i} className="flex gap-2">
-          <input
-            className="field"
-            value={value}
-            placeholder={placeholder}
-            onChange={(e) => onChange(values.map((v, j) => (j === i ? e.target.value : v)))}
-          />
-          <button
-            type="button"
-            className="btn-ghost px-3"
-            onClick={() => onChange(values.filter((_, j) => j !== i))}
-            aria-label="Remove"
-          >
-            <IconTrash width={16} height={16} />
-          </button>
-        </div>
-      ))}
-      <button type="button" className="btn-ghost" onClick={() => onChange([...values, ''])}>
-        <IconPlus width={15} height={15} />
-        Add feature
-      </button>
-    </div>
   );
 }
 

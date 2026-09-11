@@ -17,13 +17,10 @@ export interface Product {
   features: string[];
   specs: Spec[];
   unit: string;
-  mrp: number;
   price: number;
-  discountPercent: number;
   rating: number;
   reviewCount: number;
   inStock: boolean;
-  featured: boolean;
   /** `seed` came from the original IrriKart site; `admin` was added here. */
   source: 'seed' | 'admin';
   updatedAt: string;
@@ -37,10 +34,8 @@ export interface Category {
   id: string;
   name: string;
   blurb: string;
-  image: string | null;
   imageUrl: string | null;
-  sortOrder: number;
-  source: 'seed' | 'admin';
+  productCount: number;
 }
 
 export interface AdminUser {
@@ -56,7 +51,6 @@ export interface Stats {
   adminProducts: number;
   seedProducts: number;
   outOfStock: number;
-  featured: number;
   categories: number;
   inventoryValue: number;
   averagePrice: number;

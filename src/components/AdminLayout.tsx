@@ -23,7 +23,7 @@ export function AdminLayout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-ink-100 bg-white transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-ink-100 bg-white transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -109,10 +109,7 @@ export function AdminLayout() {
             <span className="block h-0.5 w-5 bg-current shadow-[0_6px_0_currentColor,0_-6px_0_currentColor]" />
           </button>
           <h1 className="text-lg font-bold text-ink-900">{current?.label ?? 'Admin'}</h1>
-          <span className="ml-auto hidden items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-            Phase 1
-          </span>
+        
         </header>
 
         <main className="flex-1 px-5 py-6">

@@ -3,21 +3,15 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AdminLayout } from './components/AdminLayout';
 import { UnderDevelopment } from './components/UnderDevelopment';
 import { useAuth } from './lib/auth';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
 import { ProductsPage } from './pages/ProductsPage';
 
 /** Copy for the tabs that are routed but not built out in phase 1. */
 const WIP = {
-  categories: [
-    'Categories',
-    'Create and reorder catalogue categories, set their cover images and control which ones surface on the app home screen.',
-  ],
-  inventory: [
-    'Inventory',
-    'Stock levels per warehouse, low-stock alerts and bulk restocking. Stock quantity is editable today from the product form.',
-  ],
   orders: [
     'Orders',
     'Incoming orders, payment status, packing slips and delivery tracking for every IrriKart shipment.',
@@ -74,6 +68,8 @@ export function App() {
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/products/new" element={<ProductFormPage />} />
         <Route path="/products/:id" element={<ProductFormPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/inventory" element={<InventoryPage />} />
         {Object.entries(WIP).map(([path, [title, blurb]]) => (
           <Route
             key={path}

@@ -29,8 +29,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: IconDashboard, wip: false, group: 'Catalogue' },
   { to: '/products', label: 'Product Catalog', icon: IconBox, wip: false, group: 'Catalogue' },
-  { to: '/categories', label: 'Categories', icon: IconLayers, wip: true, group: 'Catalogue' },
-  { to: '/inventory', label: 'Inventory', icon: IconTag, wip: true, group: 'Catalogue' },
+  { to: '/categories', label: 'Categories', icon: IconLayers, wip: false, group: 'Catalogue' },
+  { to: '/inventory', label: 'Inventory', icon: IconTag, wip: false, group: 'Catalogue' },
   { to: '/orders', label: 'Orders', icon: IconCart, wip: true, group: 'Commerce' },
   { to: '/customers', label: 'Customers', icon: IconUsers, wip: true, group: 'Commerce' },
   { to: '/promotions', label: 'Promotions', icon: IconMegaphone, wip: true, group: 'Commerce' },
