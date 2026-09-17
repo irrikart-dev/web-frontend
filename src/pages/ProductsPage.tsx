@@ -3,11 +3,17 @@ import { Link } from 'react-router-dom';
 
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '../components/icons';
 import { api, imageSrc } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { getCategories } from '../lib/categories';
 import { formatMoney } from '../lib/format';
 import type { Category, Product } from '../lib/types';
 
 export function ProductsPage() {
+  const { user } = useAuth();
+  // a VENDOR sees/edits only their own products, through the /vendor/products
+  // endpoints — same page, same components, just a different API base
+  const base = user?.role === 'VENDOR' ? '/vendor' : '/admin';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
@@ -19,7 +25,7 @@ export function ProductsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([api<{ data: Product[] }>('/admin/products'), getCategories()]);
+      const [p, c] = await Promise.all([api<{ data: Product[] }>(`${base}/products`), getCategories()]);
       setProducts(p.data);
       setCategories(c);
       setError(null);
@@ -28,7 +34,7 @@ export function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [base]);
 
   useEffect(() => {
     void load();
@@ -62,7 +68,7 @@ export function ProductsPage() {
 
   async function toggle(product: Product, field: 'active') {
     try {
-      const res = await api<{ data: Product }>(`/admin/products/${product.id}`, {
+      const res = await api<{ data: Product }>(`${base}/products/${product.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ [field]: !product[field] }),
       });
@@ -75,7 +81,7 @@ export function ProductsPage() {
   async function remove(product: Product) {
     if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
     try {
-      await api(`/admin/products/${product.id}`, { method: 'DELETE' });
+      await api(`${base}/products/${product.id}`, { method: 'DELETE' });
       setProducts((rows) => rows.filter((r) => r.id !== product.id));
       flash(`Deleted ${product.name}`);
     } catch (e) {
@@ -157,6 +163,7 @@ export function ProductsPage() {
                 <ProductRow
                   key={p.id}
                   product={p}
+                  base={base}
                   categoryName={categoryName(p.category)}
                   onPatched={patchRow}
                   onToggle={toggle}
@@ -179,6 +186,7 @@ export function ProductsPage() {
 
 function ProductRow({
   product,
+  base,
   categoryName,
   onPatched,
   onToggle,
@@ -186,6 +194,7 @@ function ProductRow({
   onError,
 }: {
   product: Product;
+  base: string;
   categoryName: string;
   onPatched: (p: Product) => void;
   onToggle: (p: Product, field: 'active') => void;
@@ -218,7 +227,7 @@ function ProductRow({
       <td className="px-4 py-3 font-mono text-xs text-ink-700">{product.sku}</td>
       <td className="px-4 py-3 text-ink-700">{categoryName}</td>
       <td className="px-4 py-3">
-        <PriceEditor product={product} onPatched={onPatched} onError={onError} />
+        <PriceEditor product={product} base={base} onPatched={onPatched} onError={onError} />
       </td>
       <td className="px-4 py-3">
         {product.stockQty > 0 ? (
@@ -269,10 +278,12 @@ function ProductRow({
 /** Inline selling-price editor. Saves through the pricing endpoint. */
 function PriceEditor({
   product,
+  base,
   onPatched,
   onError,
 }: {
   product: Product;
+  base: string;
   onPatched: (p: Product) => void;
   onError: (msg: string) => void;
 }) {
@@ -283,7 +294,9 @@ function PriceEditor({
   async function save() {
     setBusy(true);
     try {
-      const res = await api<{ data: Product }>(`/admin/products/${product.id}/pricing`, {
+      // general product update, not the admin-only /pricing quick-action endpoint —
+      // this same path already handles a price-only patch, and works for vendors too
+      const res = await api<{ data: Product }>(`${base}/products/${product.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ price: Number(price) }),
       });

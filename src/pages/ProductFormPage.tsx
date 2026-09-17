@@ -6,13 +6,19 @@ import { Dropzone } from '../components/Dropzone';
 import { Field, ListEditor, Toggle } from '../components/form';
 import { ImageThumbnail } from '../components/ImageThumbnail';
 import { ApiError, api, imageSrc, resolveAssetUrl, uploadImage } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { getCategories } from '../lib/categories';
-import type { Category, Product, Spec } from '../lib/types';
+import { getVendors } from '../lib/vendors';
+import type { Category, Product, Spec, Vendor } from '../lib/types';
 
 interface FormState {
   name: string;
   sku: string;
   category: string;
+  // admin-only: which vendor this product is created under. Ignored on update (no
+  // vendor reassignment) and never shown/sent for a VENDOR-role caller — the backend
+  // pins that to their own vendor id regardless.
+  vendorId: string;
   tagline: string;
   description: string;
   unit: string;
@@ -29,6 +35,7 @@ const EMPTY: FormState = {
   name: '',
   sku: '',
   category: '',
+  vendorId: '',
   tagline: '',
   description: '',
   unit: 'piece',
@@ -43,14 +50,20 @@ const EMPTY: FormState = {
 
 const UNITS = ['piece', 'set', 'roll', 'pack', 'box', 'metre', 'kg', 'litre'];
 
-/** Add and edit share one screen — the only difference is the request verb. */
+/** Add and edit share one screen — the only difference is the request verb. Also
+ * shared between the admin's Product Catalog and a vendor's My Products, just against
+ * a different API base (see `base` below). */
 export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role !== 'VENDOR';
+  const base = isAdmin ? '/admin' : '/vendor';
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [existing, setExisting] = useState<Product | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -88,9 +101,20 @@ export function ProductFormPage() {
       .catch((e) => setError((e as Error).message));
   }, []);
 
+  // vendor picker is admin-only, and only matters on create (no vendor reassignment)
+  useEffect(() => {
+    if (!isAdmin || !isNew) return;
+    getVendors()
+      .then((v) => {
+        setVendors(v);
+        setForm((f) => (f.vendorId ? f : { ...f, vendorId: v[0]?.id ?? '' }));
+      })
+      .catch((e) => setError((e as Error).message));
+  }, [isAdmin, isNew]);
+
   useEffect(() => {
     if (isNew) return;
-    api<{ data: Product }>(`/admin/products/${id}`)
+    api<{ data: Product }>(`${base}/products/${id}`)
       .then((r) => {
         const p = r.data;
         setExisting(p);
@@ -98,6 +122,7 @@ export function ProductFormPage() {
           name: p.name,
           sku: p.sku,
           category: p.category,
+          vendorId: p.vendorId,
           tagline: p.tagline,
           description: p.description,
           unit: p.unit,
@@ -112,7 +137,7 @@ export function ProductFormPage() {
       })
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false));
-  }, [id, isNew]);
+  }, [id, isNew, base]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -143,6 +168,9 @@ export function ProductFormPage() {
       // URL slug is always auto-derived from the name too, never user-set.
       ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
       category: form.category,
+      // vendorId only makes sense for admin's create request — a vendor's own create
+      // endpoint doesn't accept it at all, it's pinned server-side to their own vendor
+      ...(isAdmin && isNew ? { vendorId: form.vendorId } : {}),
       tagline: form.tagline.trim(),
       description: form.description.trim(),
       unit: form.unit,
@@ -157,9 +185,9 @@ export function ProductFormPage() {
 
     try {
       if (isNew) {
-        await api('/admin/products', { method: 'POST', body: JSON.stringify(payload) });
+        await api(`${base}/products`, { method: 'POST', body: JSON.stringify(payload) });
       } else {
-        await api(`/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        await api(`${base}/products/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
       }
       navigate('/products');
     } catch (err) {
@@ -256,6 +284,28 @@ export function ProductFormPage() {
                 </select>
               </Field>
             </div>
+
+            {isAdmin &&
+              (isNew ? (
+                <Field label="Vendor" error={fieldErrors.vendorId} required>
+                  <select
+                    className="field"
+                    value={form.vendorId}
+                    onChange={(e) => set('vendorId', e.target.value)}
+                    required
+                  >
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.storeName}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                existing?.vendor && (
+                  <p className="text-xs text-ink-300">Sold by {existing.vendor.storeName}</p>
+                )
+              ))}
 
             <Field label="Tagline" error={fieldErrors.tagline}>
               <input

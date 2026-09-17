@@ -16,10 +16,14 @@ import {
 
 import { api, onUnauthorized } from './api';
 import { firebaseAuth } from './firebase';
-import type { AdminUser } from './types';
+import type { AdminUser, Vendor } from './types';
+
+const ALLOWED_ROLES = ['ADMIN', 'VENDOR'];
 
 interface AuthValue {
   user: AdminUser | null;
+  /** Set only when user.role === 'VENDOR' — the caller's own vendor profile. */
+  vendor: Vendor | null;
   /** True until Firebase's own session check (and our role lookup) resolve. */
   loading: boolean;
   logIn: (email: string, password: string) => Promise<void>;
@@ -34,13 +38,20 @@ async function syncAdminUser(): Promise<AdminUser> {
   return res.data;
 }
 
+async function fetchVendorProfile(): Promise<Vendor> {
+  const res = await api<{ data: Vendor }>('/vendor/me');
+  return res.data;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
+  const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
 
   const logOut = useCallback(async () => {
     await signOut(firebaseAuth);
     setUser(null);
+    setVendor(null);
   }, []);
 
   // Firebase restores the signed-in session (if any) from IndexedDB on load and
@@ -49,20 +60,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return onAuthStateChanged(firebaseAuth, async (fbUser: FirebaseUser | null) => {
       if (!fbUser) {
         setUser(null);
+        setVendor(null);
         setLoading(false);
         return;
       }
       try {
         const synced = await syncAdminUser();
-        if (synced.role !== 'ADMIN') {
+        if (!ALLOWED_ROLES.includes(synced.role)) {
           await signOut(firebaseAuth);
           setUser(null);
+          setVendor(null);
         } else {
           setUser(synced);
+          setVendor(synced.role === 'VENDOR' ? await fetchVendorProfile() : null);
         }
       } catch {
         await signOut(firebaseAuth);
         setUser(null);
+        setVendor(null);
       } finally {
         setLoading(false);
       }
@@ -79,16 +94,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logIn = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(firebaseAuth, email, password);
     const synced = await syncAdminUser();
-    if (synced.role !== 'ADMIN') {
+    if (!ALLOWED_ROLES.includes(synced.role)) {
       await signOut(firebaseAuth);
-      throw new Error('This account is not an IrriKart administrator.');
+      throw new Error('This account is not an IrriKart administrator or vendor.');
     }
     setUser(synced);
+    setVendor(synced.role === 'VENDOR' ? await fetchVendorProfile() : null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, logIn, logOut }),
-    [user, loading, logIn, logOut],
+    () => ({ user, vendor, loading, logIn, logOut }),
+    [user, vendor, loading, logIn, logOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

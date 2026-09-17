@@ -9,7 +9,9 @@ let inflight: Promise<Category[]> | null = null;
 export async function getCategories(): Promise<Category[]> {
   if (cache) return cache;
   if (!inflight) {
-    inflight = api<{ data: Category[] }>('/admin/categories')
+    // public endpoint, not /admin/categories — identical data (categories have no
+    // visibility flag), but this way it also works for the VENDOR role's product form
+    inflight = api<{ data: Category[] }>('/catalog/categories', { auth: false })
       .then((res) => {
         cache = res.data;
         return cache;

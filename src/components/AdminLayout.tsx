@@ -3,13 +3,16 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../lib/auth';
 import { IconClose, IconLogout } from './icons';
-import { NAV_GROUPS, NAV_ITEMS } from './nav-items';
+import { NAV_GROUPS, NAV_ITEMS, VENDOR_NAV_ITEMS } from './nav-items';
 
 export function AdminLayout() {
   const { user, logOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
-  const current = NAV_ITEMS.find((i) => pathname.startsWith(i.to));
+  const isVendor = user?.role === 'VENDOR';
+  const items = isVendor ? VENDOR_NAV_ITEMS : NAV_ITEMS;
+  const groups = NAV_GROUPS.filter((g) => items.some((i) => i.group === g));
+  const current = items.find((i) => pathname.startsWith(i.to));
 
   return (
     <div className="min-h-screen lg:flex">
@@ -32,7 +35,7 @@ export function AdminLayout() {
           <div className="leading-tight">
             <p className="text-base font-extrabold tracking-tight text-ink-900">IrriKart</p>
             <p className="text-[11px] font-semibold tracking-widest text-brand-600 uppercase">
-              Admin
+              {isVendor ? 'Vendor' : 'Admin'}
             </p>
           </div>
           <button
@@ -45,13 +48,13 @@ export function AdminLayout() {
         </div>
 
         <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
-          {NAV_GROUPS.map((group) => (
+          {groups.map((group) => (
             <div key={group}>
               <p className="px-3 pb-2 text-[10px] font-bold tracking-widest text-ink-300 uppercase">
                 {group}
               </p>
               <ul className="space-y-0.5">
-                {NAV_ITEMS.filter((i) => i.group === group).map((item) => (
+                {items.filter((i) => i.group === group).map((item) => (
                   <li key={item.to}>
                     <NavLink
                       to={item.to}

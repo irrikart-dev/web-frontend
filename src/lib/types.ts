@@ -8,6 +8,8 @@ export interface Product {
   sku: string;
   slug: string;
   name: string;
+  vendorId: string;
+  vendor: { id: string; storeName: string; slug: string } | null;
   category: string;
   image: string | null;
   imageUrl: string | null;
@@ -27,6 +29,41 @@ export interface Product {
   // Admin-only fields.
   active: boolean;
   stockQty: number;
+  createdAt: string;
+}
+
+export interface Vendor {
+  id: string;
+  storeName: string;
+  slug: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  commissionPercent: number;
+  legalBusinessName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  /** Created directly with Razorpay, outside this app — see backend vendors.service.js. */
+  razorpayAccountId: string | null;
+  /** Raw Razorpay activation_status (e.g. "activated", "under_review"), or null if unset. */
+  routeStatus: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderSummary {
+  id: string;
+  orderNumber: string;
+  status: string;
+  amount: number;
+  currency: string;
+  createdAt: string;
+}
+
+export interface Payout {
+  orderNumber: string;
+  amount: number;
+  status: string;
+  transferId: string | null;
+  transferStatus: string | null;
   createdAt: string;
 }
 
