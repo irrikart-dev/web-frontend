@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react';
 
-import { ApiError } from '../lib/api';
+import { IconEye, IconEyeOff } from '../components/icons';
 import { useAuth } from '../lib/auth';
 
 export function LoginPage() {
   const { logIn } = useAuth();
-  const [email, setEmail] = useState('admin@irrikart.in');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -18,7 +19,7 @@ export function LoginPage() {
       await logIn(email, password);
       // Routing is handled by <App>: `user` flipping to non-null swaps the tree.
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
     } finally {
       setBusy(false);
     }
@@ -82,15 +83,30 @@ export function LoginPage() {
               <label className="label" htmlFor="password">
                 Password
               </label>
-              <input
-                id="password"
-                className="field"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  className="field pr-10"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute top-1/2 right-3 -translate-y-1/2 text-ink-300 hover:text-ink-700"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <IconEyeOff width={18} height={18} />
+                  ) : (
+                    <IconEye width={18} height={18} />
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -103,13 +119,6 @@ export function LoginPage() {
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-
-          {/* Phase-1 convenience. Delete this block once real admin accounts exist. */}
-          <div className="mt-8 rounded-lg border border-dashed border-ink-100 bg-white px-4 py-3 text-xs text-ink-500">
-            <p className="font-semibold text-ink-700">Demo credentials</p>
-            <p className="mt-1 font-mono">admin@irrikart.in</p>
-            <p className="font-mono">Admin@123</p>
-          </div>
         </div>
       </div>
     </div>

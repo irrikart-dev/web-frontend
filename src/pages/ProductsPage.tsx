@@ -3,15 +3,21 @@ import { Link } from 'react-router-dom';
 
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '../components/icons';
 import { api, imageSrc } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { getCategories } from '../lib/categories';
 import { formatMoney } from '../lib/format';
 import type { Category, Product } from '../lib/types';
 
 export function ProductsPage() {
+  const { user } = useAuth();
+  // a VENDOR sees/edits only their own products, through the /vendor/products
+  // endpoints — same page, same components, just a different API base
+  const base = user?.role === 'VENDOR' ? '/vendor' : '/admin';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<'' | 'seed' | 'admin'>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -19,19 +25,16 @@ export function ProductsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([
-        api<{ data: Product[] }>('/admin/products'),
-        api<{ data: Category[] }>('/admin/categories'),
-      ]);
+      const [p, c] = await Promise.all([api<{ data: Product[] }>(`${base}/products`), getCategories()]);
       setProducts(p.data);
-      setCategories(c.data);
+      setCategories(c);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [base]);
 
   useEffect(() => {
     void load();
@@ -54,19 +57,18 @@ export function ProductsPage() {
     return products.filter(
       (p) =>
         (!categoryFilter || p.category === categoryFilter) &&
-        (!sourceFilter || p.source === sourceFilter) &&
         (!q ||
           p.name.toLowerCase().includes(q) ||
           p.sku.toLowerCase().includes(q) ||
           p.slug.includes(q)),
     );
-  }, [products, search, categoryFilter, sourceFilter]);
+  }, [products, search, categoryFilter]);
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
 
-  async function toggle(product: Product, field: 'active' | 'featured') {
+  async function toggle(product: Product, field: 'active') {
     try {
-      const res = await api<{ data: Product }>(`/admin/products/${product.id}`, {
+      const res = await api<{ data: Product }>(`${base}/products/${product.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ [field]: !product[field] }),
       });
@@ -79,7 +81,7 @@ export function ProductsPage() {
   async function remove(product: Product) {
     if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
     try {
-      await api(`/admin/products/${product.id}`, { method: 'DELETE' });
+      await api(`${base}/products/${product.id}`, { method: 'DELETE' });
       setProducts((rows) => rows.filter((r) => r.id !== product.id));
       flash(`Deleted ${product.name}`);
     } catch (e) {
@@ -110,15 +112,6 @@ export function ProductsPage() {
               {c.name}
             </option>
           ))}
-        </select>
-        <select
-          className="field w-auto"
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value as '' | 'seed' | 'admin')}
-        >
-          <option value="">All sources</option>
-          <option value="seed">Original catalogue</option>
-          <option value="admin">Added here</option>
         </select>
         <Link to="/products/new" className="btn-primary">
           <IconPlus width={16} height={16} />
@@ -170,6 +163,7 @@ export function ProductsPage() {
                 <ProductRow
                   key={p.id}
                   product={p}
+                  base={base}
                   categoryName={categoryName(p.category)}
                   onPatched={patchRow}
                   onToggle={toggle}
@@ -192,6 +186,7 @@ export function ProductsPage() {
 
 function ProductRow({
   product,
+  base,
   categoryName,
   onPatched,
   onToggle,
@@ -199,9 +194,10 @@ function ProductRow({
   onError,
 }: {
   product: Product;
+  base: string;
   categoryName: string;
   onPatched: (p: Product) => void;
-  onToggle: (p: Product, field: 'active' | 'featured') => void;
+  onToggle: (p: Product, field: 'active') => void;
   onDelete: (p: Product) => void;
   onError: (msg: string) => void;
 }) {
@@ -231,7 +227,7 @@ function ProductRow({
       <td className="px-4 py-3 font-mono text-xs text-ink-700">{product.sku}</td>
       <td className="px-4 py-3 text-ink-700">{categoryName}</td>
       <td className="px-4 py-3">
-        <PriceEditor product={product} onPatched={onPatched} onError={onError} />
+        <PriceEditor product={product} base={base} onPatched={onPatched} onError={onError} />
       </td>
       <td className="px-4 py-3">
         {product.stockQty > 0 ? (
@@ -255,17 +251,6 @@ function ProductRow({
           >
             {product.active ? 'Live' : 'Hidden'}
           </button>
-          <button
-            onClick={() => onToggle(product, 'featured')}
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-              product.featured
-                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                : 'bg-ink-100 text-ink-500 hover:bg-ink-100/70'
-            }`}
-            title="Featured products lead the app home screen"
-          >
-            &#9733;
-          </button>
         </div>
       </td>
       <td className="px-4 py-3">
@@ -279,13 +264,8 @@ function ProductRow({
           </Link>
           <button
             onClick={() => onDelete(product)}
-            disabled={product.source === 'seed'}
-            className="rounded-lg p-2 text-ink-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
-            title={
-              product.source === 'seed'
-                ? 'Original catalogue products cannot be deleted - hide them instead'
-                : 'Delete product'
-            }
+            className="rounded-lg p-2 text-ink-500 transition hover:bg-red-50 hover:text-red-600"
+            title="Delete product"
           >
             <IconTrash width={17} height={17} />
           </button>
@@ -295,27 +275,30 @@ function ProductRow({
   );
 }
 
-/** Inline MRP + selling-price editor. Saves through the pricing endpoint. */
+/** Inline selling-price editor. Saves through the pricing endpoint. */
 function PriceEditor({
   product,
+  base,
   onPatched,
   onError,
 }: {
   product: Product;
+  base: string;
   onPatched: (p: Product) => void;
   onError: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [mrp, setMrp] = useState(String(product.mrp));
   const [price, setPrice] = useState(String(product.price));
   const [busy, setBusy] = useState(false);
 
   async function save() {
     setBusy(true);
     try {
-      const res = await api<{ data: Product }>(`/admin/products/${product.id}/pricing`, {
+      // general product update, not the admin-only /pricing quick-action endpoint —
+      // this same path already handles a price-only patch, and works for vendors too
+      const res = await api<{ data: Product }>(`${base}/products/${product.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ mrp: Number(mrp), price: Number(price) }),
+        body: JSON.stringify({ price: Number(price) }),
       });
       onPatched(res.data);
       setEditing(false);
@@ -330,7 +313,6 @@ function PriceEditor({
     return (
       <button
         onClick={() => {
-          setMrp(String(product.mrp));
           setPrice(String(product.price));
           setEditing(true);
         }}
@@ -340,31 +322,12 @@ function PriceEditor({
         <span className="font-semibold text-ink-900 group-hover:text-brand-700">
           {formatMoney(product.price)}
         </span>
-        {product.discountPercent > 0 && (
-          <>
-            <span className="ml-2 text-xs text-ink-300 line-through">
-              {formatMoney(product.mrp)}
-            </span>
-            <span className="ml-1.5 text-xs font-semibold text-brand-600">
-              -{product.discountPercent}%
-            </span>
-          </>
-        )}
       </button>
     );
   }
 
   return (
     <div className="flex items-center gap-1.5">
-      <input
-        className="field w-20 px-2 py-1 text-xs"
-        type="number"
-        min={0}
-        value={mrp}
-        onChange={(e) => setMrp(e.target.value)}
-        aria-label="MRP"
-        placeholder="MRP"
-      />
       <input
         className="field w-20 px-2 py-1 text-xs"
         type="number"

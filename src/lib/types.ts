@@ -25,6 +25,8 @@ export interface Product {
   sku: string;
   slug: string;
   name: string;
+  vendorId: string;
+  vendor: { id: string; storeName: string; slug: string } | null;
   category: string;
   image: string | null;
   imageUrl: string | null;
@@ -38,13 +40,10 @@ export interface Product {
   features: string[];
   specs: Spec[];
   unit: string;
-  mrp: number;
   price: number;
-  discountPercent: number;
   rating: number;
   reviewCount: number;
   inStock: boolean;
-  featured: boolean;
   /** `seed` came from the original IrriKart site; `admin` was added here. */
   source: 'seed' | 'admin';
   updatedAt: string;
@@ -54,14 +53,47 @@ export interface Product {
   createdAt: string;
 }
 
+export interface Vendor {
+  id: string;
+  storeName: string;
+  slug: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  commissionPercent: number;
+  legalBusinessName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  /** Created directly with Razorpay, outside this app — see backend vendors.service.js. */
+  razorpayAccountId: string | null;
+  /** Raw Razorpay activation_status (e.g. "activated", "under_review"), or null if unset. */
+  routeStatus: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderSummary {
+  id: string;
+  orderNumber: string;
+  status: string;
+  amount: number;
+  currency: string;
+  createdAt: string;
+}
+
+export interface Payout {
+  orderNumber: string;
+  amount: number;
+  status: string;
+  transferId: string | null;
+  transferStatus: string | null;
+  createdAt: string;
+}
+
 export interface Category {
   id: string;
   name: string;
   blurb: string;
-  image: string | null;
   imageUrl: string | null;
-  sortOrder: number;
-  source: 'seed' | 'admin';
+  productCount: number;
 }
 
 export interface AdminUser {
@@ -77,7 +109,6 @@ export interface Stats {
   adminProducts: number;
   seedProducts: number;
   outOfStock: number;
-  featured: number;
   categories: number;
   inventoryValue: number;
   averagePrice: number;
