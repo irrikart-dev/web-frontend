@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { IconPlus, IconTrash } from '../components/icons';
 import { ApiError, api, imageSrc } from '../lib/api';
 import { formatMoney } from '../lib/format';
-import type { Category, Product, Spec } from '../lib/types';
+import type { Category, GalleryImage, Product, ProductVariant, Spec } from '../lib/types';
 
 interface FormState {
   name: string;
@@ -18,6 +18,7 @@ interface FormState {
   price: string;
   stockQty: string;
   imageUrl: string;
+  videoUrl: string;
   features: string[];
   specs: Spec[];
   inStock: boolean;
@@ -37,6 +38,7 @@ const EMPTY: FormState = {
   price: '',
   stockQty: '0',
   imageUrl: '',
+  videoUrl: '',
   features: [],
   specs: [],
   inStock: true,
@@ -87,6 +89,7 @@ export function ProductFormPage() {
           price: String(p.price),
           stockQty: String(p.stockQty),
           imageUrl: p.imageUrl ?? '',
+          videoUrl: p.videoUrl ?? '',
           features: p.features,
           specs: p.specs,
           inStock: p.inStock,
@@ -100,6 +103,93 @@ export function ProductFormPage() {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // Gallery images and variants save immediately on their own actions rather
+  // than waiting for the main form submit — each is a standalone admin
+  // endpoint, and re-pulling the product after every mutation keeps the
+  // lists (and their server-assigned ids) in sync without re-deriving state.
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+  const [variantError, setVariantError] = useState<string | null>(null);
+
+  async function reloadExisting() {
+    if (isNew) return;
+    const r = await api<{ data: Product }>(`/admin/products/${id}`);
+    setExisting(r.data);
+  }
+
+  async function addGalleryImage(url: string) {
+    if (!id || !url.trim()) return;
+    setGalleryError(null);
+    try {
+      await api(`/admin/products/${id}/images`, {
+        method: 'POST',
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      await reloadExisting();
+    } catch (e) {
+      setGalleryError(e instanceof ApiError ? e.message : 'Could not add that image.');
+    }
+  }
+
+  async function removeGalleryImage(imageId: string) {
+    if (!id) return;
+    setGalleryError(null);
+    try {
+      await api(`/admin/products/${id}/images/${imageId}`, { method: 'DELETE' });
+      await reloadExisting();
+    } catch (e) {
+      setGalleryError(e instanceof ApiError ? e.message : 'Could not remove that image.');
+    }
+  }
+
+  async function addVariant(input: {
+    size: string;
+    unit: string;
+    price: string;
+    stockQty: string;
+  }) {
+    if (!id) return;
+    setVariantError(null);
+    try {
+      await api(`/admin/products/${id}/variants`, {
+        method: 'POST',
+        body: JSON.stringify({
+          size: input.size.trim() || undefined,
+          unit: input.unit,
+          price: Number(input.price),
+          stockQty: Number(input.stockQty) || 0,
+        }),
+      });
+      await reloadExisting();
+    } catch (e) {
+      setVariantError(e instanceof ApiError ? e.message : 'Could not add that variant.');
+    }
+  }
+
+  async function saveVariant(variantId: string, patch: Partial<ProductVariant>) {
+    if (!id) return;
+    setVariantError(null);
+    try {
+      await api(`/admin/products/${id}/variants/${variantId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+      await reloadExisting();
+    } catch (e) {
+      setVariantError(e instanceof ApiError ? e.message : 'Could not save that variant.');
+    }
+  }
+
+  async function deleteVariant(variantId: string) {
+    if (!id) return;
+    setVariantError(null);
+    try {
+      await api(`/admin/products/${id}/variants/${variantId}`, { method: 'DELETE' });
+      await reloadExisting();
+    } catch (e) {
+      setVariantError(e instanceof ApiError ? e.message : 'Could not delete that variant.');
+    }
+  }
 
   const discount = useMemo(() => {
     const mrp = Number(form.mrp);
@@ -127,6 +217,7 @@ export function ProductFormPage() {
       price: Number(form.price),
       stockQty: Number(form.stockQty),
       imageUrl: form.imageUrl.trim() || null,
+      videoUrl: form.videoUrl.trim() || null,
       features: form.features.map((f) => f.trim()).filter(Boolean),
       specs: form.specs.filter((s) => s.label.trim() && s.value.trim()),
       inStock: form.inStock,
@@ -367,7 +458,7 @@ export function ProductFormPage() {
             <Field
               label="Image URL"
               error={fieldErrors.imageUrl}
-              hint="Direct link to a square product photo. Uploads land in a later phase."
+              hint="Direct link to a square product photo. This is the primary photo shown everywhere except the PDP gallery."
             >
               <input
                 className="field"
@@ -386,7 +477,40 @@ export function ProductFormPage() {
                 </div>
               )}
             </div>
+            <Field
+              label="Demo video (YouTube URL)"
+              error={fieldErrors.videoUrl}
+              hint="Shown as a 'Watch video' chip on the product page."
+            >
+              <input
+                className="field"
+                type="url"
+                value={form.videoUrl}
+                onChange={(e) => set('videoUrl', e.target.value)}
+                placeholder="https://youtube.com/watch?v=..."
+              />
+            </Field>
           </section>
+
+          {!isNew && existing && (
+            <GallerySection
+              images={existing.galleryImages}
+              error={galleryError}
+              onAdd={addGalleryImage}
+              onRemove={removeGalleryImage}
+            />
+          )}
+
+          {!isNew && existing && (
+            <VariantsSection
+              variants={existing.variants}
+              units={UNITS}
+              error={variantError}
+              onAdd={addVariant}
+              onSave={saveVariant}
+              onDelete={deleteVariant}
+            />
+          )}
         </div>
       </div>
     </form>
@@ -526,6 +650,254 @@ function SpecEditor({
         <IconPlus width={15} height={15} />
         Add specification
       </button>
+    </div>
+  );
+}
+
+/** Extra product photos beyond the primary image — the PDP gallery reads all of these. */
+function GallerySection({
+  images,
+  error,
+  onAdd,
+  onRemove,
+}: {
+  images: GalleryImage[];
+  error: string | null;
+  onAdd: (url: string) => Promise<void>;
+  onRemove: (imageId: string) => Promise<void>;
+}) {
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <section className="card space-y-4 p-5">
+      <h3 className="text-sm font-bold text-ink-900">Gallery</h3>
+      <p className="-mt-2 text-xs text-ink-500">
+        Extra angles and in-use shots for the product page's swipeable gallery.
+      </p>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-3 gap-2">
+        {images.map((img) => (
+          <div key={img.id} className="group relative aspect-square overflow-hidden rounded-lg border border-ink-100">
+            <img src={img.url} alt="" className="h-full w-full object-cover" />
+            <button
+              type="button"
+              onClick={() => onRemove(img.id)}
+              className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100"
+              aria-label="Remove image"
+            >
+              <IconTrash width={14} height={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          className="field"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://..."
+        />
+        <button
+          type="button"
+          className="btn-ghost px-3"
+          disabled={busy || !url.trim()}
+          onClick={async () => {
+            setBusy(true);
+            await onAdd(url);
+            setUrl('');
+            setBusy(false);
+          }}
+        >
+          <IconPlus width={15} height={15} />
+          Add
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Size/pack options beyond the primary variant created with the product. */
+function VariantsSection({
+  variants,
+  units,
+  error,
+  onAdd,
+  onSave,
+  onDelete,
+}: {
+  variants: ProductVariant[];
+  units: string[];
+  error: string | null;
+  onAdd: (input: { size: string; unit: string; price: string; stockQty: string }) => Promise<void>;
+  onSave: (variantId: string, patch: Partial<ProductVariant>) => Promise<void>;
+  onDelete: (variantId: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState({ size: '', unit: units[0] ?? 'piece', price: '', stockQty: '0' });
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <section className="card space-y-4 p-5">
+      <h3 className="text-sm font-bold text-ink-900">Variants</h3>
+      <p className="-mt-2 text-xs text-ink-500">
+        Size/pack options the app shows as a selector. The first variant is the default shown
+        everywhere else and can't be deleted.
+      </p>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="space-y-2">
+        {variants.map((v, i) => (
+          <VariantRow
+            key={v.id}
+            variant={v}
+            units={units}
+            deletable={i > 0}
+            onSave={(patch) => onSave(v.id, patch)}
+            onDelete={() => onDelete(v.id)}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap items-end gap-2 border-t border-ink-100 pt-3">
+        <div className="w-28">
+          <label className="label">Size/label</label>
+          <input
+            className="field"
+            value={draft.size}
+            onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
+            placeholder="Pack of 5"
+          />
+        </div>
+        <div className="w-24">
+          <label className="label">Unit</label>
+          <select
+            className="field"
+            value={draft.unit}
+            onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))}
+          >
+            {units.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="w-24">
+          <label className="label">Price</label>
+          <input
+            className="field"
+            type="number"
+            min={0}
+            value={draft.price}
+            onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
+          />
+        </div>
+        <div className="w-24">
+          <label className="label">Stock</label>
+          <input
+            className="field"
+            type="number"
+            min={0}
+            value={draft.stockQty}
+            onChange={(e) => setDraft((d) => ({ ...d, stockQty: e.target.value }))}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn-ghost px-3"
+          disabled={busy || !draft.price}
+          onClick={async () => {
+            setBusy(true);
+            await onAdd(draft);
+            setDraft({ size: '', unit: units[0] ?? 'piece', price: '', stockQty: '0' });
+            setBusy(false);
+          }}
+        >
+          <IconPlus width={15} height={15} />
+          Add variant
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function VariantRow({
+  variant,
+  units,
+  deletable,
+  onSave,
+  onDelete,
+}: {
+  variant: ProductVariant;
+  units: string[];
+  deletable: boolean;
+  onSave: (patch: Partial<ProductVariant>) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [size, setSize] = useState(variant.size ?? '');
+  const [unit, setUnit] = useState(variant.unit);
+  const [price, setPrice] = useState(String(variant.price));
+  const [stockQty, setStockQty] = useState(String(variant.stockQty));
+  const [busy, setBusy] = useState(false);
+
+  const dirty =
+    size !== (variant.size ?? '') ||
+    unit !== variant.unit ||
+    price !== String(variant.price) ||
+    stockQty !== String(variant.stockQty);
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-lg bg-ink-50 p-2">
+      <div className="w-28">
+        <input className="field" value={size} onChange={(e) => setSize(e.target.value)} placeholder="Size/label" />
+      </div>
+      <div className="w-24">
+        <select className="field" value={unit} onChange={(e) => setUnit(e.target.value)}>
+          {units.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="w-24">
+        <input className="field" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
+      </div>
+      <div className="w-24">
+        <input
+          className="field"
+          type="number"
+          min={0}
+          value={stockQty}
+          onChange={(e) => setStockQty(e.target.value)}
+        />
+      </div>
+      <button
+        type="button"
+        className="btn-ghost px-3"
+        disabled={!dirty || busy}
+        onClick={async () => {
+          setBusy(true);
+          await onSave({ size: size.trim() || undefined, unit, price: Number(price), stockQty: Number(stockQty) });
+          setBusy(false);
+        }}
+      >
+        Save
+      </button>
+      {deletable && (
+        <button
+          type="button"
+          className="btn-ghost px-3"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await onDelete();
+            setBusy(false);
+          }}
+          aria-label="Delete variant"
+        >
+          <IconTrash width={16} height={16} />
+        </button>
+      )}
     </div>
   );
 }

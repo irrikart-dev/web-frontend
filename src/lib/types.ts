@@ -3,6 +3,23 @@ export interface Spec {
   value: string;
 }
 
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  size: string | null;
+  color: string | null;
+  unit: string;
+  price: number;
+  stockQty: number;
+  available: number;
+}
+
+export interface GalleryImage {
+  id: string;
+  url: string;
+  position: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -12,6 +29,10 @@ export interface Product {
   image: string | null;
   imageUrl: string | null;
   displayImageUrl: string | null;
+  images: string[];
+  galleryImages: GalleryImage[];
+  videoUrl: string | null;
+  variants: ProductVariant[];
   tagline: string;
   description: string;
   features: string[];
