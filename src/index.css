@@ -83,3 +83,10 @@
     @apply rounded-xl border border-ink-100 bg-white shadow-sm;
   }
 }
+
+/* Public legal pages: Tailwind's preflight strips link styling. */
+.legal a {
+  color: var(--color-brand-800);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

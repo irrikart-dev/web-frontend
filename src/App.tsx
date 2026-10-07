@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { AdminLayout } from './components/AdminLayout';
 import { UnderDevelopment } from './components/UnderDevelopment';
@@ -9,6 +9,9 @@ import { BrandsPage } from './pages/BrandsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { DeleteAccountPage } from './pages/legal/DeleteAccountPage';
+import { PrivacyPage } from './pages/legal/PrivacyPage';
+import { TermsPage } from './pages/legal/TermsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
 import { PaymentsPage } from './pages/PaymentsPage';
@@ -38,7 +41,21 @@ const WIP = {
   ],
 } as const;
 
+/** Public pages linked from the mobile app and the Play Store listing. */
+const PUBLIC_PAGES: Record<string, () => JSX.Element> = {
+  '/privacy': PrivacyPage,
+  '/terms': TermsPage,
+  '/delete-account': DeleteAccountPage,
+};
+
 export function App() {
+  const { pathname } = useLocation();
+  const PublicPage = PUBLIC_PAGES[pathname.replace(/\/+$/, '') || '/'];
+  if (PublicPage) return <PublicPage />;
+  return <AdminApp />;
+}
+
+function AdminApp() {
   const { user, loading } = useAuth();
 
   // Hold the tree until the stored token has been checked, otherwise a
