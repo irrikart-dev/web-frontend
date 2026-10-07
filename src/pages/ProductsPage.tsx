@@ -4,20 +4,33 @@ import { Link } from 'react-router-dom';
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '../components/icons';
 import { api, imageSrc } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { getBrands } from '../lib/brands';
 import { getCategories } from '../lib/categories';
 import { formatMoney } from '../lib/format';
-import type { Category, Product } from '../lib/types';
+import type { Brand, Category, Product, ProductStatus } from '../lib/types';
+
+const STATUS_LABEL: Record<ProductStatus, string> = { PUBLISHED: 'Live', DRAFT: 'Draft', ARCHIVED: 'Archived' };
+const STATUS_STYLE: Record<ProductStatus, string> = {
+  PUBLISHED: 'bg-brand-50 text-brand-700',
+  DRAFT: 'bg-amber-50 text-amber-700',
+  ARCHIVED: 'bg-ink-100 text-ink-500',
+};
 
 export function ProductsPage() {
   const { user } = useAuth();
   // a VENDOR sees/edits only their own products, through the /vendor/products
   // endpoints — same page, same components, just a different API base
-  const base = user?.role === 'VENDOR' ? '/vendor' : '/admin';
+  const isAdmin = user?.role !== 'VENDOR';
+  const base = isAdmin ? '/admin' : '/vendor';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ProductStatus | ''>('');
+  const [brands, setBrands] = useState<Brand[]>([]);
+  // admin bulk edit: ids of the ticked rows
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -25,9 +38,15 @@ export function ProductsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([api<{ data: Product[] }>(`${base}/products`), getCategories()]);
+      const [p, c, b] = await Promise.all([
+        api<{ data: Product[] }>(`${base}/products`),
+        getCategories(),
+        getBrands(),
+      ]);
       setProducts(p.data);
       setCategories(c);
+      setBrands(b);
+      setSelected(new Set());
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -57,25 +76,52 @@ export function ProductsPage() {
     return products.filter(
       (p) =>
         (!categoryFilter || p.category === categoryFilter) &&
+        (!statusFilter || p.status === statusFilter) &&
         (!q ||
           p.name.toLowerCase().includes(q) ||
           p.sku.toLowerCase().includes(q) ||
           p.slug.includes(q)),
     );
-  }, [products, search, categoryFilter]);
+  }, [products, search, categoryFilter, statusFilter]);
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
 
-  async function toggle(product: Product, field: 'active') {
+  async function changeStatus(product: Product, status: ProductStatus) {
     try {
       const res = await api<{ data: Product }>(`${base}/products/${product.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ [field]: !product[field] }),
+        body: JSON.stringify({ status }),
       });
       patchRow(res.data);
     } catch (e) {
       flash((e as Error).message);
     }
+  }
+
+  async function bulkUpdate(change: { status?: ProductStatus; category?: string; brandId?: string | null }) {
+    try {
+      const res = await api<{ data: { updated: number } }>('/admin/products/bulk', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids: [...selected], ...change }),
+      });
+      flash(`Updated ${res.data.updated} products`);
+      await load();
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  }
+
+  const allVisibleSelected = visible.length > 0 && visible.every((p) => selected.has(p.id));
+  function toggleAll() {
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((p) => p.id)));
+  }
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   async function remove(product: Product) {
@@ -113,11 +159,33 @@ export function ProductsPage() {
             </option>
           ))}
         </select>
+        <select
+          className="field w-auto"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as ProductStatus | '')}
+        >
+          <option value="">Any status</option>
+          {(Object.keys(STATUS_LABEL) as ProductStatus[]).map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
         <Link to="/products/new" className="btn-primary">
           <IconPlus width={16} height={16} />
           Add product
         </Link>
       </div>
+
+      {isAdmin && selected.size > 0 && (
+        <BulkBar
+          count={selected.size}
+          categories={categories}
+          brands={brands}
+          onApply={bulkUpdate}
+          onClear={() => setSelected(new Set())}
+        />
+      )}
 
       {toast && (
         <p className="rounded-lg border border-ink-100 bg-white px-4 py-2.5 text-sm text-ink-700 shadow-sm">
@@ -135,26 +203,37 @@ export function ProductsPage() {
           <table className="w-full min-w-[880px] text-sm">
             <thead className="bg-ink-50 text-left text-xs font-semibold tracking-wide text-ink-500 uppercase">
               <tr>
+                {isAdmin && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-brand-500"
+                      checked={allVisibleSelected}
+                      onChange={toggleAll}
+                      aria-label="Select all shown"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">SKU</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Pricing</th>
                 <th className="px-4 py-3">Stock</th>
-                <th className="px-4 py-3">Visibility</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-100">
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-ink-500">
+                  <td colSpan={isAdmin ? 8 : 7} className="px-4 py-10 text-center text-ink-500">
                     Loading catalogue...
                   </td>
                 </tr>
               )}
               {!loading && visible.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-ink-500">
+                  <td colSpan={isAdmin ? 8 : 7} className="px-4 py-10 text-center text-ink-500">
                     No products match those filters.
                   </td>
                 </tr>
@@ -165,8 +244,10 @@ export function ProductsPage() {
                   product={p}
                   base={base}
                   categoryName={categoryName(p.category)}
+                  selected={isAdmin ? selected.has(p.id) : undefined}
+                  onSelect={() => toggleOne(p.id)}
                   onPatched={patchRow}
-                  onToggle={toggle}
+                  onStatus={changeStatus}
                   onDelete={remove}
                   onError={flash}
                 />
@@ -188,22 +269,38 @@ function ProductRow({
   product,
   base,
   categoryName,
+  selected,
+  onSelect,
   onPatched,
-  onToggle,
+  onStatus,
   onDelete,
   onError,
 }: {
   product: Product;
   base: string;
   categoryName: string;
+  /** undefined = no selection column (vendor view) */
+  selected?: boolean;
+  onSelect: () => void;
   onPatched: (p: Product) => void;
-  onToggle: (p: Product, field: 'active') => void;
+  onStatus: (p: Product, status: ProductStatus) => void;
   onDelete: (p: Product) => void;
   onError: (msg: string) => void;
 }) {
   const src = imageSrc(product);
   return (
     <tr className="hover:bg-ink-50/60">
+      {selected !== undefined && (
+        <td className="px-4 py-3">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-brand-500"
+            checked={selected}
+            onChange={onSelect}
+            aria-label={`Select ${product.name}`}
+          />
+        </td>
+      )}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-ink-100 bg-white">
@@ -218,8 +315,8 @@ function ProductRow({
           <div className="min-w-0">
             <p className="truncate font-semibold text-ink-900">{product.name}</p>
             <p className="truncate text-xs text-ink-300">
-              {product.source === 'seed' ? 'Original catalogue' : 'Added in dashboard'} ·{' '}
-              {product.unit}
+              {product.brandName ? `${product.brandName} · ` : ''}
+              {product.source === 'seed' ? 'Original catalogue' : 'Added in dashboard'} · {product.unit}
             </p>
           </div>
         </div>
@@ -239,19 +336,18 @@ function ProductRow({
         )}
       </td>
       <td className="px-4 py-3">
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => onToggle(product, 'active')}
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-              product.active
-                ? 'bg-brand-50 text-brand-700 hover:bg-brand-100'
-                : 'bg-ink-100 text-ink-500 hover:bg-ink-100/70'
-            }`}
-            title="Live products appear in the app"
-          >
-            {product.active ? 'Live' : 'Hidden'}
-          </button>
-        </div>
+        <select
+          value={product.status}
+          onChange={(e) => onStatus(product, e.target.value as ProductStatus)}
+          className={`cursor-pointer rounded-full border-0 px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[product.status]}`}
+          title="Only Live products appear in the app"
+        >
+          {(Object.keys(STATUS_LABEL) as ProductStatus[]).map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
       </td>
       <td className="px-4 py-3">
         <div className="flex justify-end gap-1">
@@ -342,6 +438,76 @@ function PriceEditor({
       </button>
       <button onClick={() => setEditing(false)} className="btn-ghost px-2 py-1 text-xs">
         Cancel
+      </button>
+    </div>
+  );
+}
+
+/** Shown while rows are ticked: apply one change to all of them. */
+function BulkBar({
+  count,
+  categories,
+  brands,
+  onApply,
+  onClear,
+}: {
+  count: number;
+  categories: Category[];
+  brands: Brand[];
+  onApply: (change: { status?: ProductStatus; category?: string; brandId?: string | null }) => Promise<void>;
+  onClear: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const apply = (change: Parameters<typeof onApply>[0]) => {
+    setBusy(true);
+    void onApply(change).finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm">
+      <span className="font-semibold text-brand-700">{count} selected</span>
+      <select
+        className="field w-auto py-1"
+        value=""
+        disabled={busy}
+        onChange={(e) => e.target.value && apply({ status: e.target.value as ProductStatus })}
+      >
+        <option value="">Set status...</option>
+        {(Object.keys(STATUS_LABEL) as ProductStatus[]).map((s) => (
+          <option key={s} value={s}>
+            {STATUS_LABEL[s]}
+          </option>
+        ))}
+      </select>
+      <select
+        className="field w-auto py-1"
+        value=""
+        disabled={busy}
+        onChange={(e) => e.target.value && apply({ category: e.target.value })}
+      >
+        <option value="">Move to category...</option>
+        {categories.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <select
+        className="field w-auto py-1"
+        value=""
+        disabled={busy}
+        onChange={(e) => e.target.value && apply({ brandId: e.target.value === 'none' ? null : e.target.value })}
+      >
+        <option value="">Set brand...</option>
+        <option value="none">No brand</option>
+        {brands.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+      <button className="btn-ghost ml-auto py-1" onClick={onClear}>
+        Clear selection
       </button>
     </div>
   );

@@ -16,9 +16,9 @@ import {
 
 import { api, onUnauthorized } from './api';
 import { firebaseAuth } from './firebase';
-import type { AdminUser, Vendor } from './types';
+import type { AdminPermission, AdminUser, Vendor } from './types';
 
-const ALLOWED_ROLES = ['ADMIN', 'VENDOR'];
+const ALLOWED_ROLES = ['ADMIN', 'SUB_ADMIN', 'VENDOR'];
 
 interface AuthValue {
   user: AdminUser | null;
@@ -31,6 +31,14 @@ interface AuthValue {
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
+
+/** ADMIN can open every area; a SUB_ADMIN only the ones granted to them. */
+export function canAccess(user: AdminUser | null, permission?: AdminPermission | 'adminOnly'): boolean {
+  if (!user) return false;
+  if (!permission || user.role === 'ADMIN') return true;
+  if (permission === 'adminOnly') return false;
+  return user.role === 'SUB_ADMIN' && user.permissions.includes(permission);
+}
 
 /** Mirrors the verified Firebase user into our own User table, returns its role. */
 async function syncAdminUser(): Promise<AdminUser> {

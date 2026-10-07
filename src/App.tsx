@@ -2,24 +2,24 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AdminLayout } from './components/AdminLayout';
 import { UnderDevelopment } from './components/UnderDevelopment';
-import { useAuth } from './lib/auth';
+import { canAccess, useAuth } from './lib/auth';
+import { AdminOrdersPage } from './pages/AdminOrdersPage';
 import { AdminVendorsPage } from './pages/AdminVendorsPage';
+import { BrandsPage } from './pages/BrandsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
+import { PaymentsPage } from './pages/PaymentsPage';
 import { ProductsPage } from './pages/ProductsPage';
+import { StaffPage } from './pages/StaffPage';
 import { VendorDashboardPage } from './pages/VendorDashboardPage';
 import { VendorOrdersPage } from './pages/VendorOrdersPage';
 import { VendorPayoutsPage } from './pages/VendorPayoutsPage';
 
-/** Copy for the tabs that are routed but not built out in phase 1. */
+/** Copy for the tabs that are routed but not built out yet. */
 const WIP = {
-  orders: [
-    'Orders',
-    'Incoming orders, payment status, packing slips and delivery tracking for every IrriKart shipment.',
-  ],
   customers: [
     'Customers',
     'Farmer and dealer accounts, order history, addresses and support notes.',
@@ -64,6 +64,7 @@ export function App() {
   }
 
   const isVendor = user.role === 'VENDOR';
+  const can = (p: Parameters<typeof canAccess>[1]) => canAccess(user, p);
 
   return (
     <Routes>
@@ -82,10 +83,14 @@ export function App() {
           </>
         ) : (
           <>
-            <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/vendors" element={<AdminVendorsPage />} />
-            {Object.entries(WIP).map(([path, [title, blurb]]) => (
+            {can('catalog') && <Route path="/categories" element={<CategoriesPage />} />}
+            {can('catalog') && <Route path="/brands" element={<BrandsPage />} />}
+            {can('inventory') && <Route path="/inventory" element={<InventoryPage />} />}
+            {can('vendors') && <Route path="/vendors" element={<AdminVendorsPage />} />}
+            {can('orders') && <Route path="/orders" element={<AdminOrdersPage />} />}
+            {can('payments') && <Route path="/payments" element={<PaymentsPage />} />}
+            {can('adminOnly') && <Route path="/staff" element={<StaffPage />} />}
+            {can('adminOnly') && Object.entries(WIP).map(([path, [title, blurb]]) => (
               <Route
                 key={path}
                 path={`/${path}`}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
-import { useAuth } from '../lib/auth';
+import { canAccess, useAuth } from '../lib/auth';
 import { IconClose, IconLogout } from './icons';
 import { NAV_GROUPS, NAV_ITEMS, VENDOR_NAV_ITEMS } from './nav-items';
 
@@ -10,7 +10,7 @@ export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
   const isVendor = user?.role === 'VENDOR';
-  const items = isVendor ? VENDOR_NAV_ITEMS : NAV_ITEMS;
+  const items = isVendor ? VENDOR_NAV_ITEMS : NAV_ITEMS.filter((i) => canAccess(user, i.permission));
   const groups = NAV_GROUPS.filter((g) => items.some((i) => i.group === g));
   const current = items.find((i) => pathname.startsWith(i.to));
 
@@ -35,7 +35,7 @@ export function AdminLayout() {
           <div className="leading-tight">
             <p className="text-base font-extrabold tracking-tight text-ink-900">IrriKart</p>
             <p className="text-[11px] font-semibold tracking-widest text-brand-600 uppercase">
-              {isVendor ? 'Vendor' : 'Admin'}
+              {isVendor ? 'Vendor' : user?.role === 'SUB_ADMIN' ? 'Staff' : 'Admin'}
             </p>
           </div>
           <button

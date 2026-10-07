@@ -7,14 +7,25 @@ import { Field, ListEditor, Toggle } from '../components/form';
 import { ImageThumbnail } from '../components/ImageThumbnail';
 import { ApiError, api, imageSrc, resolveAssetUrl, uploadImage } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { getBrands } from '../lib/brands';
 import { getCategories } from '../lib/categories';
 import { getVendors } from '../lib/vendors';
-import type { Category, GalleryImage, Product, ProductVariant, Spec, Vendor } from '../lib/types';
+import type {
+  Brand,
+  Category,
+  GalleryImage,
+  Product,
+  ProductStatus,
+  ProductVariant,
+  Spec,
+  Vendor,
+} from '../lib/types';
 
 interface FormState {
   name: string;
   sku: string;
   category: string;
+  brandId: string;
   // admin-only: which vendor this product is created under. Ignored on update (no
   // vendor reassignment) and never shown/sent for a VENDOR-role caller — the backend
   // pins that to their own vendor id regardless.
@@ -29,13 +40,14 @@ interface FormState {
   features: string[];
   specs: Spec[];
   inStock: boolean;
-  active: boolean;
+  status: ProductStatus;
 }
 
 const EMPTY: FormState = {
   name: '',
   sku: '',
   category: '',
+  brandId: '',
   vendorId: '',
   tagline: '',
   description: '',
@@ -47,10 +59,11 @@ const EMPTY: FormState = {
   features: [],
   specs: [],
   inStock: true,
-  active: true,
+  status: 'PUBLISHED',
 };
 
-const UNITS = ['piece', 'set', 'roll', 'pack', 'box', 'metre', 'kg', 'litre'];
+// a different pack size (e.g. a dozen, a carton of 50) is its own variant with its own price
+const UNITS = ['piece', 'dozen', 'carton', 'set', 'roll', 'pack', 'box', 'metre', 'kg', 'litre'];
 
 /** Add and edit share one screen — the only difference is the request verb. Also
  * shared between the admin's Product Catalog and a vendor's My Products, just against
@@ -65,6 +78,7 @@ export function ProductFormPage() {
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [existing, setExisting] = useState<Product | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -103,6 +117,12 @@ export function ProductFormPage() {
       .catch((e) => setError((e as Error).message));
   }, []);
 
+  useEffect(() => {
+    getBrands()
+      .then(setBrands)
+      .catch((e) => setError((e as Error).message));
+  }, []);
+
   // vendor picker is admin-only, and only matters on create (no vendor reassignment)
   useEffect(() => {
     if (!isAdmin || !isNew) return;
@@ -124,6 +144,7 @@ export function ProductFormPage() {
           name: p.name,
           sku: p.sku,
           category: p.category,
+          brandId: p.brandId ?? '',
           vendorId: p.vendorId,
           tagline: p.tagline,
           description: p.description,
@@ -135,7 +156,7 @@ export function ProductFormPage() {
           features: p.features,
           specs: p.specs,
           inStock: p.inStock,
-          active: p.active,
+          status: p.status,
         });
       })
       .catch((e) => setError((e as Error).message))
@@ -260,6 +281,7 @@ export function ProductFormPage() {
       // URL slug is always auto-derived from the name too, never user-set.
       ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
       category: form.category,
+      brandId: form.brandId || null,
       // vendorId only makes sense for admin's create request — a vendor's own create
       // endpoint doesn't accept it at all, it's pinned server-side to their own vendor
       ...(isAdmin && isNew ? { vendorId: form.vendorId } : {}),
@@ -273,7 +295,7 @@ export function ProductFormPage() {
       features: form.features.map((f) => f.trim()).filter(Boolean),
       specs: form.specs.filter((s) => s.label.trim() && s.value.trim()),
       inStock: form.inStock,
-      active: form.active,
+      status: form.status,
     };
 
     try {
@@ -378,6 +400,17 @@ export function ProductFormPage() {
               </Field>
             </div>
 
+            <Field label="Brand" error={fieldErrors.brandId}>
+              <select className="field" value={form.brandId} onChange={(e) => set('brandId', e.target.value)}>
+                <option value="">No brand</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
             {isAdmin &&
               (isNew ? (
                 <Field label="Vendor" error={fieldErrors.vendorId} required>
@@ -479,12 +512,17 @@ export function ProductFormPage() {
               checked={form.inStock}
               onChange={(v) => set('inStock', v)}
             />
-            <Toggle
-              label="Live"
-              hint="Unchecked hides it from the app entirely"
-              checked={form.active}
-              onChange={(v) => set('active', v)}
-            />
+            <Field label="Status" hint="Only Live products appear in the app. Archive retired products instead of deleting them.">
+              <select
+                className="field"
+                value={form.status}
+                onChange={(e) => set('status', e.target.value as ProductStatus)}
+              >
+                <option value="PUBLISHED">Live</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ARCHIVED">Archived</option>
+              </select>
+            </Field>
           </section>
 
           <section className="card space-y-3 p-5">
