@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 import { IconEye, IconEyeOff } from '../components/icons';
 import { useAuth } from '../lib/auth';
+import { firebaseAuth } from '../lib/firebase';
 
 export function LoginPage() {
   const { logIn } = useAuth();
@@ -10,6 +12,23 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Firebase emails the reset link; same message whether or not the account exists,
+  // so the form can't be used to probe which emails are registered
+  async function resetPassword() {
+    setError(null);
+    if (!email.trim()) {
+      setError('Enter your email above first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email.trim());
+    } catch {
+      // swallowed on purpose — see above
+    }
+    setNotice(`If ${email.trim()} has an account, a reset link is on its way.`);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -108,6 +127,16 @@ export function LoginPage() {
                 </button>
               </div>
             </div>
+
+            <div className="-mt-2 text-right">
+              <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={resetPassword}>
+                Forgot password?
+              </button>
+            </div>
+
+            {notice && (
+              <p className="rounded-lg border border-ink-100 bg-ink-50 px-3 py-2 text-sm text-ink-700">{notice}</p>
+            )}
 
             {error && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

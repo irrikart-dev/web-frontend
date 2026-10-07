@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { IconSearch } from '../components/icons';
+import { Modal } from '../components/Modal';
 import { api, imageSrc } from '../lib/api';
 import { getCategories } from '../lib/categories';
-import type { Category, Product } from '../lib/types';
+import { formatDate } from '../lib/format';
+import type { Category, LedgerEntry, Product } from '../lib/types';
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -16,6 +18,7 @@ export function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<Product | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +145,7 @@ export function InventoryPage() {
                   categoryName={categoryName(p.category)}
                   onPatched={patchRow}
                   onError={flash}
+                  onHistory={() => setHistoryFor(p)}
                 />
               ))}
             </tbody>
@@ -150,9 +154,79 @@ export function InventoryPage() {
       </div>
 
       <p className="text-xs text-ink-300">
-        Every stock change here is recorded in the inventory ledger with reason &quot;manual&quot;.
+        Adjustments add or remove units (e.g. +50 received, −2 damaged) and are recorded in the inventory
+        ledger with your note. Stock held by unpaid orders can't be removed.
       </p>
+
+      {historyFor && <LedgerModal product={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>
+  );
+}
+
+const REASON_LABEL: Record<string, string> = {
+  reserve: 'Held by order',
+  release: 'Hold released',
+  order: 'Sold',
+  cancel: 'Order cancelled',
+  return: 'Returned',
+  manual: 'Manual',
+};
+
+function LedgerModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const [rows, setRows] = useState<LedgerEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!product.variantId) return;
+    api<{ data: LedgerEntry[] }>(`/admin/inventory/${product.variantId}/ledger`)
+      .then((r) => setRows(r.data))
+      .catch((e) => setError((e as Error).message));
+  }, [product.variantId]);
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="card space-y-4 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-ink-900">Stock history</h2>
+            <p className="text-sm text-ink-500">
+              {product.name} · {product.sku} · last 100 movements
+            </p>
+          </div>
+          <button className="btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {!rows && !error && <p className="text-sm text-ink-500">Loading...</p>}
+        {rows?.length === 0 && <p className="text-sm text-ink-500">No stock movements yet.</p>}
+        {rows && rows.length > 0 && (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs font-semibold tracking-wide text-ink-500 uppercase">
+              <tr>
+                <th className="py-2">When</th>
+                <th className="py-2">Change</th>
+                <th className="py-2">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-100">
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td className="py-2 text-ink-500">{formatDate(r.createdAt)}</td>
+                  <td className={`py-2 font-semibold ${r.changeQty > 0 ? 'text-brand-700' : 'text-red-600'}`}>
+                    {r.changeQty > 0 ? `+${r.changeQty}` : r.changeQty}
+                  </td>
+                  <td className="py-2 text-ink-700">
+                    {REASON_LABEL[r.reason] ?? r.reason}
+                    {r.note ? ` — ${r.note}` : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -161,35 +235,35 @@ function InventoryRow({
   categoryName,
   onPatched,
   onError,
+  onHistory,
 }: {
   product: Product;
   categoryName: string;
   onPatched: (p: Product) => void;
   onError: (msg: string) => void;
+  onHistory: () => void;
 }) {
   const src = imageSrc(product);
-  const [value, setValue] = useState(String(product.stockQty));
+  const [delta, setDelta] = useState('');
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const dirty = Number(value) !== product.stockQty;
   const low = product.stockQty < LOW_STOCK_THRESHOLD;
+  const change = Number(delta);
+  const valid = Number.isInteger(change) && change !== 0 && note.trim().length > 0;
 
   async function save() {
-    const stock = Number(value);
-    if (!Number.isInteger(stock) || stock < 0) {
-      onError('Stock must be a whole number, 0 or more.');
-      setValue(String(product.stockQty));
-      return;
-    }
+    if (!product.variantId) return;
     setBusy(true);
     try {
-      const res = await api<{ data: Product }>(`/admin/products/${product.id}/stock`, {
-        method: 'PATCH',
-        body: JSON.stringify({ stock }),
+      const res = await api<{ data: { stockQty: number } }>(`/admin/inventory/${product.variantId}/adjust`, {
+        method: 'POST',
+        body: JSON.stringify({ delta: change, note: note.trim() }),
       });
-      onPatched(res.data);
+      onPatched({ ...product, stockQty: res.data.stockQty });
+      setDelta('');
+      setNote('');
     } catch (e) {
       onError((e as Error).message);
-      setValue(String(product.stockQty));
     } finally {
       setBusy(false);
     }
@@ -227,17 +301,28 @@ function InventoryRow({
           <input
             className="field w-20 px-2 py-1 text-xs"
             type="number"
-            min={0}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            aria-label="New stock quantity"
+            step={1}
+            value={delta}
+            onChange={(e) => setDelta(e.target.value)}
+            placeholder="+/−"
+            aria-label="Units to add (negative to remove)"
+          />
+          <input
+            className="field w-36 px-2 py-1 text-xs"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Reason, e.g. received"
+            aria-label="Reason for adjustment"
           />
           <button
             onClick={save}
-            disabled={busy || !dirty}
+            disabled={busy || !valid}
             className="btn-primary px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? '...' : 'Set'}
+            {busy ? '...' : 'Apply'}
+          </button>
+          <button onClick={onHistory} className="btn-ghost px-2 py-1 text-xs">
+            History
           </button>
         </div>
       </td>

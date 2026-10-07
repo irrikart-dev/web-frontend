@@ -32,7 +32,7 @@ export function VendorDashboardPage() {
   }
   if (!vendor) return <p className="text-sm text-ink-500">Loading…</p>;
 
-  const activeProducts = products.filter((p) => p.active).length;
+  const activeProducts = products.filter((p) => p.status === 'PUBLISHED').length;
   const revenue = orders
     .filter((o) => o.status !== 'CANCELLED')
     .reduce((sum, o) => sum + o.amount, 0);
