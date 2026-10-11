@@ -90,3 +90,20 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* Verbatim legal document HTML (converted from the client's .docx). */
+.legal-doc h1, .legal-doc h2, .legal-doc h3 {
+  color: var(--color-ink-900);
+  font-weight: 700;
+  margin-top: 1.75rem;
+}
+.legal-doc h1 { font-size: 1.35rem; }
+.legal-doc h2 { font-size: 1.15rem; }
+.legal-doc p { margin-top: 0.75rem; }
+.legal-doc ol, .legal-doc ul { margin-top: 0.5rem; padding-left: 1.5rem; }
+.legal-doc ol { list-style: decimal; }
+.legal-doc ul { list-style: disc; }
+.legal-doc li { margin-top: 0.25rem; }
+.legal-doc strong { color: var(--color-ink-900); }
+.legal-doc table { margin-top: 1rem; border-collapse: collapse; width: 100%; }
+.legal-doc td, .legal-doc th { border: 1px solid var(--color-ink-100); padding: 0.5rem; vertical-align: top; }

@@ -51,9 +51,9 @@ export function LoginPage() {
         <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10" />
         <div className="absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/10" />
         <img
-          src="/irrikart_logo_full.png"
+          src="/irrikart_logo_full_white.png"
           alt="IrriKart"
-          className="relative h-14 w-auto object-contain brightness-0 invert"
+          className="relative h-14 w-auto self-start object-contain"
         />
         <div className="relative text-white">
           <h2 className="text-4xl leading-tight font-extrabold">

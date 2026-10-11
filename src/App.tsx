@@ -9,8 +9,10 @@ import { BrandsPage } from './pages/BrandsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { AboutPage } from './pages/legal/AboutPage';
 import { DeleteAccountPage } from './pages/legal/DeleteAccountPage';
 import { PrivacyPage } from './pages/legal/PrivacyPage';
+import { RefundPage } from './pages/legal/RefundPage';
 import { TermsPage } from './pages/legal/TermsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
@@ -45,6 +47,8 @@ const WIP = {
 const PUBLIC_PAGES: Record<string, () => JSX.Element> = {
   '/privacy': PrivacyPage,
   '/terms': TermsPage,
+  '/refund-policy': RefundPage,
+  '/about': AboutPage,
   '/delete-account': DeleteAccountPage,
 };
 

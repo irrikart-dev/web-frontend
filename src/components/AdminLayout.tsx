@@ -31,9 +31,8 @@ export function AdminLayout() {
         }`}
       >
         <div className="flex items-center gap-3 border-b border-ink-100 px-5 py-4">
-          <img src="/irrikart_logo_mark.png" alt="" className="h-9 w-9 object-contain" />
           <div className="leading-tight">
-            <p className="text-base font-extrabold tracking-tight text-ink-900">IrriKart</p>
+            <img src="/irrikart_logo_full.png" alt="IrriKart" className="h-8 w-auto object-contain" />
             <p className="text-[11px] font-semibold tracking-widest text-brand-600 uppercase">
               {isVendor ? 'Vendor' : user?.role === 'SUB_ADMIN' ? 'Staff' : 'Admin'}
             </p>

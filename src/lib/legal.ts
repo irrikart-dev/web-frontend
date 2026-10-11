@@ -1,21 +1,15 @@
 /**
- * Business details shown on the public legal pages (/privacy, /terms,
- * /delete-account). Google Play links to these pages from the store listing,
- * so they must be accurate before the app is submitted.
- *
- * TODO(before Play submission): replace every `FILL_ME` value with the real
- * registered details.
+ * Business details for the public legal pages (/terms, /privacy,
+ * /refund-policy, /about, /delete-account), taken from the client's
+ * Terms & Conditions document (Irriworld Industries).
  */
 export const LEGAL = {
   appName: 'IrriKart',
-  /** Registered business name (proprietorship / LLP / Pvt Ltd). */
-  entity: 'FILL_ME — registered business name',
-  /** Registered office address. */
-  address: 'FILL_ME — registered office address, India',
-  supportEmail: 'FILL_ME@irrikart.com',
-  /** Grievance Officer under the DPDP Act 2023 / IT Rules 2011. */
-  grievanceOfficer: 'FILL_ME — name of grievance officer',
+  entity: 'Irriworld Industries',
+  address: 'GF Plot-108, Anand Industrial Estate, Mohan Nagar, Ghaziabad 323001, Uttar Pradesh, India',
+  supportEmail: 'support@irrikart.com',
+  grievanceOfficer: 'Grievance Officer, Irriworld Industries',
   whatsApp: '+91 97110 91823',
   whatsAppLink: 'https://wa.me/919711091823',
-  effectiveDate: '7 October 2026',
+  effectiveDate: '10 October 2026',
 } as const;

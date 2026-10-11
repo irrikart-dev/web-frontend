@@ -9,11 +9,13 @@ export function LegalLayout({ title, children }: { title: string; children: Reac
     <div className="min-h-screen bg-white text-ink-900">
       <header className="border-b border-ink-100">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
-          <img src="/irrikart_logo_mark.png" alt="" className="h-8 w-8" />
-          <span className="text-lg font-bold">IrriKart</span>
-          <nav className="ml-auto flex gap-4 text-sm text-ink-500">
+          <a href="/privacy" aria-label="IrriKart">
+            <img src="/irrikart_logo_full.png" alt="IrriKart" className="h-8 w-auto" />
+          </a>
+          <nav className="ml-auto flex flex-wrap justify-end gap-x-4 gap-y-1 text-sm text-ink-500">
             <Link to="/privacy" className="hover:text-ink-900">Privacy</Link>
             <Link to="/terms" className="hover:text-ink-900">Terms</Link>
+            <Link to="/refund-policy" className="hover:text-ink-900">Refunds</Link>
             <Link to="/delete-account" className="hover:text-ink-900">Delete account</Link>
           </nav>
         </div>
