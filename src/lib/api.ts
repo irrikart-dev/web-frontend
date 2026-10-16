@@ -67,13 +67,16 @@ export async function api<T>(
   return body as T;
 }
 
-/** Uploads an image file to object storage, returns its public URL. */
-export async function uploadImage(file: File): Promise<string> {
+/**
+ * Uploads an image file to object storage, returns its public URL. `base` is the
+ * caller's API area — vendors upload through `/vendor`, staff through `/admin`.
+ */
+export async function uploadImage(file: File, base: '/admin' | '/vendor' = '/admin'): Promise<string> {
   const token = await currentToken();
   const form = new FormData();
   form.append('file', file);
 
-  const res = await fetch(`${API_BASE}/admin/uploads/image`, {
+  const res = await fetch(`${API_BASE}${base}/uploads/image`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
@@ -81,6 +84,7 @@ export async function uploadImage(file: File): Promise<string> {
 
   const body = await res.json().catch(() => ({}) as Record<string, unknown>);
   if (!res.ok) {
+    if (res.status === 401) onUnauthorized.dispatchEvent(new Event('unauthorized'));
     throw new ApiError(res.status, (body as { message?: string }).message ?? 'Upload failed');
   }
   return (body as { data: { url: string } }).data.url;

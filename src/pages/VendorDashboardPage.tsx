@@ -3,22 +3,25 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatMoney } from '../lib/format';
-import type { OrderSummary, Product } from '../lib/types';
+import type { OrderSummary, Product, VendorPerformance } from '../lib/types';
 
 export function VendorDashboardPage() {
   const { vendor } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [performance, setPerformance] = useState<VendorPerformance | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       api<{ data: Product[] }>('/vendor/products'),
       api<{ data: OrderSummary[] }>('/vendor/orders'),
+      api<{ data: VendorPerformance }>('/vendor/performance'),
     ])
-      .then(([p, o]) => {
+      .then(([p, o, perf]) => {
         setProducts(p.data);
         setOrders(o.data);
+        setPerformance(perf.data);
       })
       .catch((e) => setError((e as Error).message));
   }, []);
@@ -42,6 +45,26 @@ export function VendorDashboardPage() {
     { label: 'Orders', value: String(orders.length), hint: 'all time' },
     { label: 'Gross sales', value: formatMoney(revenue), hint: `at ${vendor.commissionPercent}% commission` },
     { label: 'Razorpay', value: vendor.routeStatus ?? 'not linked', hint: vendor.status.toLowerCase() },
+    {
+      label: 'Rating',
+      value: performance?.rating != null ? `★ ${performance.rating.toFixed(1)}` : '—',
+      hint: `${performance?.reviewCount ?? 0} reviews`,
+    },
+    {
+      label: 'Orders delivered',
+      value: String(performance?.delivered ?? 0),
+      hint: `${performance?.inFlight ?? 0} in progress`,
+    },
+    {
+      label: 'Rejected',
+      value: `${Math.round((performance?.rejectionRate ?? 0) * 100)}%`,
+      hint: `${performance?.rejected ?? 0} of ${performance?.orders ?? 0} orders`,
+    },
+    {
+      label: 'Returned',
+      value: `${Math.round((performance?.returnRate ?? 0) * 100)}%`,
+      hint: `${performance?.returned ?? 0} of ${performance?.orders ?? 0} orders`,
+    },
   ];
 
   return (

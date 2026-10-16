@@ -266,3 +266,86 @@ export interface Stats {
   byCategory: { id: string; name: string; count: number }[];
   recentlyUpdated: Product[];
 }
+
+export interface Coupon {
+  id: string;
+  /** Stored upper-case; matched case-insensitively at checkout. */
+  code: string;
+  type: 'FLAT' | 'PERCENT';
+  value: number;
+  minCartValue: number | null;
+  usageLimit: number | null;
+  perUserLimit: number | null;
+  expiresAt: string | null;
+  active: boolean;
+  createdAt: string;
+  /** Live redemptions — a cancelled order gives its use back. */
+  uses: number;
+  uniqueCustomers: number;
+  discountGiven: number;
+  revenue: number;
+}
+
+export interface CustomerSummary {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  status: 'ACTIVE' | 'BLOCKED';
+  createdAt: string;
+  orderCount: number;
+  /** Paid orders only. */
+  totalSpent: number;
+}
+
+export interface CustomerDetail extends CustomerSummary {
+  addresses: {
+    id: string;
+    name: string;
+    phone: string;
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    pincode: string;
+    isDefault: boolean;
+  }[];
+  /** Last 20, newest first. */
+  orders: { id: string; orderNumber: string; status: OrderStatus; totalAmount: number; createdAt: string; vendor: string }[];
+}
+
+export interface VendorPerformance {
+  vendorId: string;
+  /** Orders the vendor was responsible for: delivered + in flight + rejected + returned. */
+  orders: number;
+  delivered: number;
+  inFlight: number;
+  rejected: number;
+  returned: number;
+  gmv: number;
+  /** Review-weighted average across the vendor's products; null with no reviews. */
+  rating: number | null;
+  reviewCount: number;
+  /** 0–1 */
+  rejectionRate: number;
+  /** 0–1 */
+  returnRate: number;
+}
+
+export type RfqStatus = 'NEW' | 'CONTACTED' | 'CLOSED';
+
+/** A bulk-quote lead from the app. Staff follow up outside the dashboard. */
+export interface RfqRequest {
+  id: string;
+  status: RfqStatus;
+  quantity: number;
+  requirements: string | null;
+  /** Per unit, whole rupees. */
+  targetPrice: number | null;
+  /** Staff-only. */
+  adminNote: string | null;
+  createdAt: string;
+  /** Null for a general request, or when the product was since deleted. */
+  product: { id: string; title: string; slug: string } | null;
+  customer: { name: string | null; phone: string | null; email: string | null };
+}

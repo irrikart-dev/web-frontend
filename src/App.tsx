@@ -7,6 +7,7 @@ import { AdminOrdersPage } from './pages/AdminOrdersPage';
 import { AdminVendorsPage } from './pages/AdminVendorsPage';
 import { BrandsPage } from './pages/BrandsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { CustomersPage } from './pages/CustomersPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { AboutPage } from './pages/legal/AboutPage';
@@ -18,6 +19,8 @@ import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { ProductsPage } from './pages/ProductsPage';
+import { PromotionsPage } from './pages/PromotionsPage';
+import { RfqPage } from './pages/RfqPage';
 import { StaffPage } from './pages/StaffPage';
 import { VendorDashboardPage } from './pages/VendorDashboardPage';
 import { VendorOrdersPage } from './pages/VendorOrdersPage';
@@ -25,14 +28,6 @@ import { VendorPayoutsPage } from './pages/VendorPayoutsPage';
 
 /** Copy for the tabs that are routed but not built out yet. */
 const WIP = {
-  customers: [
-    'Customers',
-    'Farmer and dealer accounts, order history, addresses and support notes.',
-  ],
-  promotions: [
-    'Promotions',
-    'Coupon codes, seasonal campaigns and homepage banners for the app and storefront.',
-  ],
   reports: [
     'Reports',
     'Revenue, best sellers, category performance and stock movement over time.',
@@ -109,8 +104,11 @@ function AdminApp() {
             {can('inventory') && <Route path="/inventory" element={<InventoryPage />} />}
             {can('vendors') && <Route path="/vendors" element={<AdminVendorsPage />} />}
             {can('orders') && <Route path="/orders" element={<AdminOrdersPage />} />}
+            {can('orders') && <Route path="/rfq" element={<RfqPage />} />}
             {can('payments') && <Route path="/payments" element={<PaymentsPage />} />}
             {can('adminOnly') && <Route path="/staff" element={<StaffPage />} />}
+            {can('adminOnly') && <Route path="/customers" element={<CustomersPage />} />}
+            {can('adminOnly') && <Route path="/promotions" element={<PromotionsPage />} />}
             {can('adminOnly') && Object.entries(WIP).map(([path, [title, blurb]]) => (
               <Route
                 key={path}

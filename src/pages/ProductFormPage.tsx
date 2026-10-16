@@ -265,7 +265,7 @@ export function ProductFormPage() {
     if (imageFile) {
       setUploading(true);
       try {
-        imageUrl = await uploadImage(imageFile);
+        imageUrl = await uploadImage(imageFile, base);
       } catch (err) {
         setUploadError(err instanceof ApiError ? err.message : 'Upload failed.');
         setSaving(false);

@@ -2,18 +2,32 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, imageSrc } from '../lib/api';
+import { canAccess, useAuth } from '../lib/auth';
 import { formatCompactMoney, formatMoney } from '../lib/format';
 import type { Stats } from '../lib/types';
 
 export function DashboardPage() {
+  const { user } = useAuth();
+  // the stats are catalogue/inventory numbers — the API only serves them to those areas
+  const seesStats = canAccess(user, 'catalog') || canAccess(user, 'inventory');
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!seesStats) return;
     api<{ data: Stats }>('/admin/stats')
       .then((r) => setStats(r.data))
       .catch((e) => setError(e.message));
-  }, []);
+  }, [seesStats]);
+
+  if (!seesStats) {
+    return (
+      <section className="card p-5">
+        <h2 className="text-sm font-bold text-ink-900">Welcome{user?.name ? `, ${user.name}` : ''}</h2>
+        <p className="mt-2 text-sm text-ink-500">Use the tabs on the left to open the areas you have access to.</p>
+      </section>
+    );
+  }
 
   if (error) {
     return (

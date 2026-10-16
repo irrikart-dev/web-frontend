@@ -5,7 +5,8 @@ import { Field } from '../components/form';
 import { Modal } from '../components/Modal';
 import { ApiError, api } from '../lib/api';
 import { getVendors, invalidateVendors } from '../lib/vendors';
-import type { Vendor } from '../lib/types';
+import { formatMoney } from '../lib/format';
+import type { Vendor, VendorPerformance } from '../lib/types';
 
 interface FormState {
   storeName: string;
@@ -33,6 +34,7 @@ export function AdminVendorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
+  const [performance, setPerformance] = useState<Map<string, VendorPerformance>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,6 +52,13 @@ export function AdminVendorsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // stats are a nice-to-have on this screen — the vendor list still works without them
+  useEffect(() => {
+    api<{ data: VendorPerformance[] }>('/admin/vendors/performance')
+      .then((r) => setPerformance(new Map(r.data.map((p) => [p.vendorId, p]))))
+      .catch(() => setPerformance(new Map()));
+  }, []);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -128,10 +137,11 @@ export function AdminVendorsPage() {
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead className="bg-ink-50 text-left text-xs font-semibold tracking-wide text-ink-500 uppercase">
               <tr>
                 <th className="px-4 py-3">Vendor</th>
+                <th className="px-4 py-3">Performance</th>
                 <th className="px-4 py-3">Commission</th>
                 <th className="px-4 py-3">Razorpay</th>
                 <th className="px-4 py-3">Status</th>
@@ -141,14 +151,14 @@ export function AdminVendorsPage() {
             <tbody className="divide-y divide-ink-100">
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-ink-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-ink-500">
                     Loading vendors...
                   </td>
                 </tr>
               )}
               {!loading && vendors.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-ink-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-ink-500">
                     No vendors yet.
                   </td>
                 </tr>
@@ -158,6 +168,9 @@ export function AdminVendorsPage() {
                   <td className="px-4 py-3">
                     <p className="font-semibold text-ink-900">{v.storeName}</p>
                     <p className="text-xs text-ink-300">{v.contactEmail ?? v.slug}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <PerformanceCell stats={performance.get(v.id)} />
                   </td>
                   <td className="px-4 py-3 text-ink-700">{v.commissionPercent}%</td>
                   <td className="px-4 py-3">
@@ -196,6 +209,28 @@ export function AdminVendorsPage() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+const pct = (rate: number) => `${Math.round(rate * 100)}%`;
+
+function PerformanceCell({ stats }: { stats?: VendorPerformance }) {
+  if (!stats || (stats.orders === 0 && stats.reviewCount === 0)) {
+    return <span className="text-xs text-ink-300">no orders yet</span>;
+  }
+  return (
+    <div className="text-xs text-ink-500">
+      <p className="font-semibold text-ink-900">
+        {stats.rating != null ? `★ ${stats.rating.toFixed(1)}` : 'No ratings'}
+        <span className="font-normal text-ink-300"> ({stats.reviewCount})</span>
+      </p>
+      <p>
+        {stats.orders} orders · {formatMoney(stats.gmv)}
+      </p>
+      <p className={stats.rejectionRate > 0.1 ? 'text-red-600' : undefined}>
+        {pct(stats.rejectionRate)} rejected · {pct(stats.returnRate)} returned
+      </p>
     </div>
   );
 }
