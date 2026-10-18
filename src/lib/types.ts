@@ -283,6 +283,14 @@ export interface Coupon {
   perUserLimit: number | null;
   expiresAt: string | null;
   active: boolean;
+  /** One line for the app's offers list. */
+  description: string | null;
+  /** Shown in the app's offers list; otherwise customers need to know the code. */
+  listed: boolean;
+  /** Only for a customer with no confirmed order yet. */
+  firstOrderOnly: boolean;
+  /** Set = only this customer can use it. */
+  customer: { id: string; name: string | null; email: string | null; phone: string | null } | null;
   createdAt: string;
   /** Live redemptions — a cancelled order gives its use back. */
   uses: number;

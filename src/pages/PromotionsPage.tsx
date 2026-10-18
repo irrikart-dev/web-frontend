@@ -16,6 +16,11 @@ interface FormState {
   perUserLimit: string;
   expiresAt: string;
   active: boolean;
+  description: string;
+  listed: boolean;
+  firstOrderOnly: boolean;
+  /** Email or phone of the one customer it's for; blank = everyone. */
+  customerContact: string;
 }
 
 const EMPTY: FormState = {
@@ -27,6 +32,10 @@ const EMPTY: FormState = {
   perUserLimit: '1',
   expiresAt: '',
   active: true,
+  description: '',
+  listed: false,
+  firstOrderOnly: false,
+  customerContact: '',
 };
 
 const discountLabel = (c: Coupon) => (c.type === 'PERCENT' ? `${c.value}% off` : `${formatMoney(c.value)} off`);
@@ -159,6 +168,9 @@ export function PromotionsPage() {
                   <td className="px-4 py-3 text-xs text-ink-500">
                     {c.minCartValue != null && <p>Min cart {formatMoney(c.minCartValue)}</p>}
                     {c.perUserLimit != null && <p>{c.perUserLimit} per customer</p>}
+                    {c.firstOrderOnly && <p>First order only</p>}
+                    {c.customer && <p>Only for {c.customer.name ?? c.customer.email ?? c.customer.phone}</p>}
+                    {c.listed && <p className="text-brand-700">Shown in the app's offers</p>}
                     <p>{c.expiresAt ? `${isExpired(c) ? 'Expired' : 'Expires'} ${formatDate(c.expiresAt)}` : 'No expiry'}</p>
                   </td>
                   <td className="px-4 py-3 text-ink-700">
@@ -210,6 +222,10 @@ function CouponForm({ coupon, onClose, onSaved }: { coupon: Coupon | null; onClo
           perUserLimit: coupon.perUserLimit == null ? '' : String(coupon.perUserLimit),
           expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 10) : '',
           active: coupon.active,
+          description: coupon.description ?? '',
+          listed: coupon.listed,
+          firstOrderOnly: coupon.firstOrderOnly,
+          customerContact: coupon.customer?.email ?? coupon.customer?.phone ?? '',
         }
       : EMPTY,
   );
@@ -233,6 +249,10 @@ function CouponForm({ coupon, onClose, onSaved }: { coupon: Coupon | null; onClo
       // valid through the end of the chosen day, local time
       expiresAt: form.expiresAt ? new Date(`${form.expiresAt}T23:59:59`).toISOString() : null,
       active: form.active,
+      description: form.description.trim() || null,
+      listed: form.listed,
+      firstOrderOnly: form.firstOrderOnly,
+      customerContact: form.customerContact.trim() || null,
     };
     try {
       await api(coupon ? `/admin/coupons/${coupon.id}` : '/admin/coupons', {
@@ -297,12 +317,46 @@ function CouponForm({ coupon, onClose, onSaved }: { coupon: Coupon | null; onClo
         </Field>
       </div>
 
-      <Toggle
-        label="Active"
-        hint="Customers can only apply active, unexpired coupons."
-        checked={form.active}
-        onChange={(v) => set('active', v)}
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Offer text" hint="One line shown in the app's offers list.">
+          <input
+            className="field"
+            maxLength={120}
+            placeholder="e.g. ₹100 off drip kits over ₹2,000"
+            value={form.description}
+            onChange={(e) => set('description', e.target.value)}
+          />
+        </Field>
+        <Field label="Only for customer" hint="Their email or phone. Blank = anyone with the code.">
+          <input
+            className="field"
+            placeholder="ramesh@example.com or 98765 43210"
+            value={form.customerContact}
+            onChange={(e) => set('customerContact', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="space-y-3">
+        <Toggle
+          label="Active"
+          hint="Customers can only apply active, unexpired coupons."
+          checked={form.active}
+          onChange={(v) => set('active', v)}
+        />
+        <Toggle
+          label="Show in the app's offers"
+          hint="Lists it for every customer. A customer-only coupon always shows for that customer."
+          checked={form.listed}
+          onChange={(v) => set('listed', v)}
+        />
+        <Toggle
+          label="First order only"
+          hint="Only customers who haven't completed an order yet can use it."
+          checked={form.firstOrderOnly}
+          onChange={(v) => set('firstOrderOnly', v)}
+        />
+      </div>
 
       <div className="flex justify-end gap-2 border-t border-ink-100 pt-4">
         <button type="button" className="btn-ghost" onClick={onClose}>
