@@ -349,3 +349,29 @@ export interface RfqRequest {
   product: { id: string; title: string; slug: string } | null;
   customer: { name: string | null; phone: string | null; email: string | null };
 }
+
+export type ReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/** A product review in the moderation queue. Only APPROVED ones show in the app. */
+export interface AdminReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  status: ReviewStatus;
+  createdAt: string;
+  product: { id: string; title: string; slug: string };
+  customer: { name: string | null; phone: string | null; email: string | null };
+}
+
+/** Home-screen hero banner in the app. Lower `position` shows first. */
+export interface Banner {
+  id: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  ctaLabel: string;
+  link: string | null;
+  imageUrl: string | null;
+  position: number;
+  active: boolean;
+}

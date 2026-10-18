@@ -197,3 +197,31 @@ export const IconShield = (p: IconProps) => (
     <path d="m9 12 2 2 4-4" />
   </Base>
 );
+
+export const IconChat = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5A8 8 0 1 1 21 12Z" />
+  </Base>
+);
+
+export const IconImage = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="8.5" cy="9.5" r="1.5" />
+    <path d="m21 16-5-5-9 9" />
+  </Base>
+);
+
+export const IconBell = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8Z" />
+    <path d="M10.3 20a1.9 1.9 0 0 0 3.4 0" />
+  </Base>
+);
+
+export const IconReturn = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h11a5 5 0 0 1 0 10h-3" />
+  </Base>
+);

@@ -5,6 +5,7 @@ import { UnderDevelopment } from './components/UnderDevelopment';
 import { canAccess, useAuth } from './lib/auth';
 import { AdminOrdersPage } from './pages/AdminOrdersPage';
 import { AdminVendorsPage } from './pages/AdminVendorsPage';
+import { BannersPage } from './pages/BannersPage';
 import { BrandsPage } from './pages/BrandsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { CustomersPage } from './pages/CustomersPage';
@@ -20,6 +21,7 @@ import { ProductFormPage } from './pages/ProductFormPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { PromotionsPage } from './pages/PromotionsPage';
+import { ReviewsPage } from './pages/ReviewsPage';
 import { RfqPage } from './pages/RfqPage';
 import { StaffPage } from './pages/StaffPage';
 import { VendorDashboardPage } from './pages/VendorDashboardPage';
@@ -101,6 +103,8 @@ function AdminApp() {
           <>
             {can('catalog') && <Route path="/categories" element={<CategoriesPage />} />}
             {can('catalog') && <Route path="/brands" element={<BrandsPage />} />}
+            {can('catalog') && <Route path="/reviews" element={<ReviewsPage />} />}
+            {can('catalog') && <Route path="/banners" element={<BannersPage />} />}
             {can('inventory') && <Route path="/inventory" element={<InventoryPage />} />}
             {can('vendors') && <Route path="/vendors" element={<AdminVendorsPage />} />}
             {can('orders') && <Route path="/orders" element={<AdminOrdersPage />} />}
