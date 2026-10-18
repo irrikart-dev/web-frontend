@@ -60,13 +60,13 @@ export function PaymentsPage() {
       {s && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Tile label="Captured" value={formatMoney(s.captured.amount)} hint={`${s.captured.count} payments`} />
-          <Tile label="Refunded" value={formatMoney(s.refunded)} hint="to customer wallets" />
+          <Tile label="Refunded" value={formatMoney(s.refunded)} hint="to customers" />
           <Tile label="Net" value={formatMoney(s.captured.amount - s.refunded)} hint="captured − refunded" />
           <Tile label="Failed / pending" value={`${s.failed.count} / ${s.pending.count}`} hint="attempts" />
           <Tile
-            label="Vendor transfer issues"
+            label="Vendor transfers failed"
             value={String(s.transferFailed)}
-            hint="failed transfers or reversals — settle in Razorpay Route"
+            hint="retry in Razorpay Route"
             alert={s.transferFailed > 0}
           />
         </div>
@@ -182,14 +182,14 @@ export function PaymentsPage() {
       )}
 
       <p className="text-xs text-ink-300">
-        Highlighted rows hold money that isn't matched: captured on a cancelled order without a full refund, a
-        vendor transfer that failed, or a vendor share that couldn't be pulled back after a wallet refund. Cash-on-delivery orders have no gateway payment and don't appear here.
+        Highlighted rows hold money that isn't matched: captured on a cancelled order without a full refund, or a
+        vendor transfer that failed. Cash-on-delivery orders have no gateway payment and don't appear here.
       </p>
     </div>
   );
 }
 
-export function Tile({ label, value, hint, alert }: { label: string; value: string; hint: string; alert?: boolean }) {
+function Tile({ label, value, hint, alert }: { label: string; value: string; hint: string; alert?: boolean }) {
   return (
     <div className={`card p-4 ${alert ? 'border-red-200 bg-red-50' : ''}`}>
       <p className="text-xs font-semibold tracking-wide text-ink-500 uppercase">{label}</p>

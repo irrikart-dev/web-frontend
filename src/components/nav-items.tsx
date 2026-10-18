@@ -50,7 +50,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/rfq', label: 'Quote Requests', icon: IconEdit, wip: false, group: 'Commerce', permission: 'orders' },
   { to: '/returns', label: 'Returns', icon: IconReturn, wip: false, group: 'Commerce', permission: 'orders' },
   { to: '/payments', label: 'Payments', icon: IconCard, wip: false, group: 'Commerce', permission: 'payments' },
-  { to: '/refunds', label: 'Refunds', icon: IconCard, wip: false, group: 'Commerce', permission: 'payments' },
   { to: '/customers', label: 'Customers', icon: IconUsers, wip: false, group: 'Commerce', permission: 'adminOnly' },
   { to: '/promotions', label: 'Promotions', icon: IconMegaphone, wip: false, group: 'Commerce', permission: 'adminOnly' },
   { to: '/notifications', label: 'Notifications', icon: IconBell, wip: false, group: 'Commerce', permission: 'adminOnly' },

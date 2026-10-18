@@ -137,10 +137,7 @@ export interface OrderDetail extends OrderSummary {
   deliveredAt: string | null;
   /** Last day the customer can ask for a return; null unless DELIVERED. */
   returnableUntil: string | null;
-  refunds: { amount: number; status: string; reason: string | null; createdAt: string }[];
   returns: ReturnRequest[];
-  /** Admin detail only: what can still be credited back to the customer's wallet. */
-  refundable?: number;
 }
 
 export interface AdminOrderSummary extends OrderSummary {
@@ -314,8 +311,6 @@ export interface CustomerSummary {
 }
 
 export interface CustomerDetail extends CustomerSummary {
-  /** Store credit from refunds. */
-  walletBalance: number;
   addresses: {
     id: string;
     name: string;
@@ -404,9 +399,6 @@ export interface ReturnRequest {
   photoUrls: string[];
   /** Shown to the customer with the decision. */
   adminNote: string | null;
-  refundAmount: number | null;
-  /** `credited` (to the wallet), or `none` when the order was already refunded in full. */
-  refundStatus: string | null;
   restocked: boolean;
   createdAt: string;
   resolvedAt: string | null;
@@ -423,22 +415,6 @@ export interface AdminReturnRequest extends ReturnRequest {
     deliveredAt: string | null;
   };
   customer: { name: string | null; phone: string | null; email: string | null };
-  /** Detail only: the returned lines' pro-rata share of what was paid. */
-  suggestedRefund?: number;
-}
-
-/** A refund credited to a customer's wallet. */
-export interface AdminRefund {
-  id: string;
-  amount: number;
-  balanceAfter: number;
-  type: 'REFUND';
-  reason: string;
-  order: { id: string; orderNumber: string } | null;
-  customer: string | null;
-  /** Issued by staff (manual refund) rather than by a cancellation or return. */
-  manual: boolean;
-  createdAt: string;
 }
 
 /** An admin broadcast to every active customer. */

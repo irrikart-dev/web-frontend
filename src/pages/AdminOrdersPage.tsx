@@ -10,8 +10,7 @@ import {
   downloadPdf,
   paymentLabel,
 } from '../components/OrderParts';
-import { ApiError, api } from '../lib/api';
-import { canAccess, useAuth } from '../lib/auth';
+import { api } from '../lib/api';
 import { formatDate, formatMoney } from '../lib/format';
 import { getVendors } from '../lib/vendors';
 import type { AdminOrderDetail, AdminOrderSummary, OrderStatus, Paged, Vendor } from '../lib/types';
@@ -196,16 +195,12 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [refunding, setRefunding] = useState(false);
-  const { user } = useAuth();
 
-  const reload = useCallback(() => {
+  useEffect(() => {
     api<{ data: AdminOrderDetail }>(`/admin/orders/${id}`)
       .then((r) => setOrder(r.data))
       .catch((e) => setError((e as Error).message));
   }, [id]);
-
-  useEffect(reload, [reload]);
 
   async function act(path: string, body: object) {
     setBusy(true);
@@ -216,8 +211,10 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
         body: JSON.stringify(body),
       });
       setOrder(res.data);
-      if (res.data.refundStatus === 'credited') {
-        setNotice("Order cancelled and the amount paid credited to the customer's wallet.");
+      if (res.data.refundStatus === 'failed') {
+        setNotice('Order cancelled, but the refund failed — retry it from the Razorpay dashboard.');
+      } else if (res.data.refundStatus) {
+        setNotice(`Order cancelled and refund ${res.data.refundStatus}.`);
       }
       onChanged();
     } catch (e) {
@@ -228,9 +225,6 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
   }
 
   const next = order ? NEXT[order.status] : undefined;
-  // what's left to credit back to the customer's wallet, if anything
-  const refundable = order?.refundable ?? 0;
-  const canRefund = refundable > 0 && canAccess(user, 'payments');
 
   return (
     <Modal onClose={onClose}>
@@ -301,26 +295,13 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
                     <li key={r.id} className="text-ink-700">
                       {r.type === 'RETURN' ? 'Return' : 'Replacement'} · {r.status.toLowerCase()} ·{' '}
                       {r.items.reduce((n, i) => n + i.quantity, 0)} unit(s) — “{r.reason}”
-                      {r.refundAmount != null && ` · ${formatMoney(r.refundAmount)} ${r.refundStatus ?? ''}`}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {refunding ? (
-              <RefundForm
-                max={refundable}
-                onCancel={() => setRefunding(false)}
-                onSubmit={async (amount, reason) => {
-                  await api(`/admin/refunds`, { method: 'POST', body: JSON.stringify({ orderId: id, amount, reason }) });
-                  setRefunding(false);
-                  setNotice(`${formatMoney(amount)} credited to the customer's wallet.`);
-                  reload();
-                  onChanged();
-                }}
-              />
-            ) : cancelling ? (
+            {cancelling ? (
               <ReasonForm
                 label="Why is this order being cancelled?"
                 confirmLabel="Cancel order"
@@ -344,11 +325,6 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
                     Invoice PDF
                   </button>
                 )}
-                {canRefund && (
-                  <button className="btn-ghost" disabled={busy} onClick={() => setRefunding(true)}>
-                    Refund
-                  </button>
-                )}
                 {CANCELLABLE.includes(order.status) && (
                   <button
                     className="btn-ghost text-red-600 hover:bg-red-50"
@@ -369,68 +345,5 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
         )}
       </div>
     </Modal>
-  );
-}
-
-/** Manual full or partial refund, credited to the customer's wallet. */
-function RefundForm({
-  max,
-  onSubmit,
-  onCancel,
-}: {
-  max: number;
-  onSubmit: (amount: number, reason: string) => Promise<void>;
-  onCancel: () => void;
-}) {
-  const [amount, setAmount] = useState(String(max));
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const value = Number(amount);
-  const valid = Number.isInteger(value) && value >= 1 && value <= max && reason.trim().length >= 3;
-  return (
-    <form
-      className="space-y-2 rounded-lg border border-ink-100 bg-ink-50 p-3"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        setError(null);
-        try {
-          await onSubmit(value, reason.trim());
-        } catch (err) {
-          setError(err instanceof ApiError ? err.message : 'Refund failed.');
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
-        <div>
-          <label className="label">Amount (₹)</label>
-          <input className="field" type="number" min={1} max={max} value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </div>
-        <div>
-          <label className="label">Reason</label>
-          <input
-            className="field"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. goodwill for late delivery"
-            minLength={3}
-            autoFocus
-          />
-        </div>
-      </div>
-      <p className="text-xs text-ink-500">Up to {formatMoney(max)} is left to refund. It's added to the customer's IrriKart wallet as store credit.</p>
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn-ghost" onClick={onCancel}>
-          Back
-        </button>
-        <button className="btn-primary" disabled={busy || !valid}>
-          {busy ? '...' : `Credit ${valid ? formatMoney(value) : ''} to wallet`}
-        </button>
-      </div>
-    </form>
   );
 }
