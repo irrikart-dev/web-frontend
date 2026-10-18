@@ -2,6 +2,7 @@ import type { ComponentType, SVGProps } from 'react';
 
 import type { AdminPermission } from '../lib/types';
 import {
+  IconBell,
   IconBox,
   IconCard,
   IconCart,
@@ -52,6 +53,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/refunds', label: 'Refunds', icon: IconCard, wip: false, group: 'Commerce', permission: 'payments' },
   { to: '/customers', label: 'Customers', icon: IconUsers, wip: false, group: 'Commerce', permission: 'adminOnly' },
   { to: '/promotions', label: 'Promotions', icon: IconMegaphone, wip: false, group: 'Commerce', permission: 'adminOnly' },
+  { to: '/notifications', label: 'Notifications', icon: IconBell, wip: false, group: 'Commerce', permission: 'adminOnly' },
   { to: '/reports', label: 'Reports', icon: IconChart, wip: true, group: 'Insights', permission: 'adminOnly' },
   { to: '/staff', label: 'Staff & Roles', icon: IconShield, wip: false, group: 'Insights', permission: 'adminOnly' },
   { to: '/settings', label: 'Settings', icon: IconCog, wip: true, group: 'Insights', permission: 'adminOnly' },

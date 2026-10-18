@@ -449,3 +449,15 @@ export interface ShippingIssues {
   /** Paid orders whose Shiprocket booking failed — retry them. */
   unbooked: (IssueOrder & { createdAt: string })[];
 }
+
+/** An admin broadcast to every active customer. */
+export interface NotificationCampaign {
+  id: string;
+  title: string;
+  body: string;
+  link: string | null;
+  recipients: number;
+  pushSent: number;
+  pushFailed: number;
+  createdAt: string;
+}

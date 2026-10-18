@@ -18,6 +18,7 @@ import { RefundPage } from './pages/legal/RefundPage';
 import { TermsPage } from './pages/legal/TermsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { RefundsPage } from './pages/RefundsPage';
 import { ReturnsPage } from './pages/ReturnsPage';
@@ -117,6 +118,7 @@ function AdminApp() {
             {can('adminOnly') && <Route path="/staff" element={<StaffPage />} />}
             {can('adminOnly') && <Route path="/customers" element={<CustomersPage />} />}
             {can('adminOnly') && <Route path="/promotions" element={<PromotionsPage />} />}
+            {can('adminOnly') && <Route path="/notifications" element={<NotificationsPage />} />}
             {can('adminOnly') && Object.entries(WIP).map(([path, [title, blurb]]) => (
               <Route
                 key={path}
