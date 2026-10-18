@@ -6,7 +6,7 @@ import { Modal } from '../components/Modal';
 import { OrderStatusBadge } from '../components/OrderParts';
 import { ApiError, api, resolveAssetUrl } from '../lib/api';
 import { formatDate, formatMoney } from '../lib/format';
-import type { AdminReturnRequest, Paged, ReturnStatus, ShippingIssues } from '../lib/types';
+import type { AdminReturnRequest, Paged, ReturnStatus } from '../lib/types';
 
 const LIMIT = 25;
 
@@ -25,25 +25,8 @@ const STATUS_STYLE: Record<ReturnStatus, string> = {
 
 const customerLabel = (c: AdminReturnRequest['customer']) => c.name ?? c.phone ?? c.email ?? 'Customer';
 
-/** Customer returns/replacements, plus parcels the courier couldn't deliver. */
+/** Customer returns and replacements. Refunds are credited to the customer's wallet. */
 export function ReturnsPage() {
-  const [tab, setTab] = useState<'requests' | 'shipping'>('requests');
-  return (
-    <div className="space-y-5">
-      <div className="flex gap-2">
-        <button className={tab === 'requests' ? 'btn-primary' : 'btn-ghost'} onClick={() => setTab('requests')}>
-          Return requests
-        </button>
-        <button className={tab === 'shipping' ? 'btn-primary' : 'btn-ghost'} onClick={() => setTab('shipping')}>
-          Shipping issues
-        </button>
-      </div>
-      {tab === 'requests' ? <ReturnRequests /> : <ShippingIssuesPanel />}
-    </div>
-  );
-}
-
-function ReturnRequests() {
   const [data, setData] = useState<Paged<AdminReturnRequest> | null>(null);
   const [status, setStatus] = useState('REQUESTED');
   const [search, setSearch] = useState('');
@@ -287,12 +270,11 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
             {r.status === 'COMPLETED' && (
               <p className="rounded-lg border border-ink-100 bg-ink-50 px-4 py-3 text-sm text-ink-700">
                 {r.restocked ? 'Restocked. ' : 'Not restocked. '}
-                {r.refundAmount != null
-                  ? r.refundStatus === 'manual'
-                    ? `${formatMoney(r.refundAmount)} to pay back by hand (COD order).`
-                    : `${formatMoney(r.refundAmount)} refund ${r.refundStatus}.`
-                  : 'No refund.'}
-                {r.refundStatus === 'failed' && ' Retry it with a manual refund from the order.'}
+                {r.refundAmount
+                  ? `${formatMoney(r.refundAmount)} credited to the customer's wallet.`
+                  : r.refundStatus === 'none'
+                    ? 'No refund — the order had already been refunded in full.'
+                    : 'No refund.'}
               </p>
             )}
             {r.adminNote && !open && <p className="text-sm text-ink-500">Note to customer: {r.adminNote}</p>}
@@ -305,7 +287,7 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
                 <div className="grid gap-4 sm:grid-cols-2">
                   {r.type === 'RETURN' && (
                     <Field
-                      label="Refund (₹)"
+                      label="Wallet credit (₹)"
                       hint={`Suggested ${formatMoney(r.suggestedRefund ?? 0)} — the items' share of what was paid.`}
                     >
                       <input className="field" type="number" min={0} value={refund} onChange={(e) => setRefund(e.target.value)} />
@@ -325,7 +307,7 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
                     </button>
                   )}
                   <button className="btn-primary" disabled={busy} onClick={() => act('complete')}>
-                    {busy ? '...' : r.type === 'RETURN' ? 'Goods received — refund' : 'Goods received — close'}
+                    {busy ? '...' : r.type === 'RETURN' ? 'Goods received — credit wallet' : 'Goods received — close'}
                   </button>
                 </div>
               </section>
@@ -334,123 +316,5 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
         )}
       </div>
     </Modal>
-  );
-}
-
-function ShippingIssuesPanel() {
-  const [data, setData] = useState<ShippingIssues | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setData((await api<{ data: ShippingIssues }>('/admin/shipments')).data);
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function act(orderId: string, path: 'shipment' | 'rto-received', done: string) {
-    setBusyId(orderId);
-    setError(null);
-    try {
-      const res = await api<{ data: { refundStatus?: string | null } }>(`/admin/orders/${orderId}/${path}`, { method: 'POST' });
-      const refund = res.data.refundStatus;
-      setNotice(refund === 'failed' ? `${done} The refund failed — retry it from the order.` : refund ? `${done} Refund ${refund}.` : done);
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Action failed.');
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-      {notice && <p className="rounded-lg border border-ink-100 bg-white px-4 py-2.5 text-sm text-ink-700 shadow-sm">{notice}</p>}
-      {!data && !error && <p className="text-sm text-ink-500">Loading...</p>}
-
-      {data && (
-        <>
-          <section className="card overflow-hidden">
-            <div className="border-b border-ink-100 px-4 py-3">
-              <h3 className="text-sm font-bold text-ink-900">Undelivered parcels</h3>
-              <p className="text-xs text-ink-500">
-                The courier is bringing these back (RTO) or couldn't deliver them. Once the parcel is back with the
-                seller, mark it received — that restocks it and refunds a prepaid order.
-              </p>
-            </div>
-            {data.shipments.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-ink-500">Nothing undelivered.</p>
-            ) : (
-              <ul className="divide-y divide-ink-100">
-                {data.shipments.map((s) => (
-                  <li key={s.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-ink-900">
-                        {s.order.orderNumber} · {formatMoney(s.order.totalAmount)}{' '}
-                        <span className="text-xs font-normal text-ink-300">
-                          {s.order.paymentMethod === 'COD' ? 'COD' : 'Paid online'}
-                          {s.awbNumber ? ` · AWB ${s.awbNumber}` : ''}
-                        </span>
-                      </p>
-                      <p className="text-xs text-ink-500">
-                        {s.status === 'RTO' ? 'Returning to origin' : 'Delivery failed'}
-                        {s.lastEvent ? ` — ${s.lastEvent.description ?? s.lastEvent.status} (${formatDate(s.lastEvent.occurredAt)})` : ''}
-                      </p>
-                    </div>
-                    <button
-                      className="btn-ghost"
-                      disabled={busyId === s.order.id}
-                      onClick={() => act(s.order.id, 'rto-received', `${s.order.orderNumber} marked returned.`)}
-                    >
-                      Parcel received back
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="card overflow-hidden">
-            <div className="border-b border-ink-100 px-4 py-3">
-              <h3 className="text-sm font-bold text-ink-900">Not booked with the courier</h3>
-              <p className="text-xs text-ink-500">Paid orders whose Shiprocket booking failed. Fix the cause (address, pickup location), then retry.</p>
-            </div>
-            {data.unbooked.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-ink-500">Every paid order is booked.</p>
-            ) : (
-              <ul className="divide-y divide-ink-100">
-                {data.unbooked.map((o) => (
-                  <li key={o.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-ink-900">
-                        {o.orderNumber} · {formatMoney(o.totalAmount)}
-                      </p>
-                      <p className="text-xs text-ink-500">Placed {formatDate(o.createdAt)}</p>
-                    </div>
-                    <OrderStatusBadge status={o.status} />
-                    <button
-                      className="btn-primary"
-                      disabled={busyId === o.id}
-                      onClick={() => act(o.id, 'shipment', `${o.orderNumber} booked with Shiprocket.`)}
-                    >
-                      Book shipment
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
-      )}
-    </div>
   );
 }

@@ -102,22 +102,10 @@ export function OrderBody({ order }: { order: OrderDetail }) {
             <dd>− {formatMoney(order.discount)}</dd>
           </div>
         )}
-        {order.shipping > 0 && (
-          <div className="flex justify-between">
-            <dt className="text-ink-500">Delivery</dt>
-            <dd>{formatMoney(order.shipping)}</dd>
-          </div>
-        )}
         <div className="flex justify-between font-bold text-ink-900">
           <dt>Total</dt>
           <dd>{formatMoney(order.amount)}</dd>
         </div>
-        {order.tax?.lines.map((t) => (
-          <div key={t.rate} className="flex justify-between text-xs text-ink-500">
-            <dt>Incl. GST {t.rate}%</dt>
-            <dd>₹{t.tax.toFixed(2)}</dd>
-          </div>
-        ))}
         <div className="flex justify-between text-xs text-ink-500">
           <dt>Seller share / commission</dt>
           <dd>

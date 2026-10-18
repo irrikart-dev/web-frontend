@@ -40,9 +40,6 @@ export interface Product {
   images: string[];
   galleryImages: GalleryImage[];
   videoUrl: string | null;
-  /** GST % included in the price; null = not set. */
-  gstRate: number | null;
-  hsnCode: string | null;
   variants: ProductVariant[];
   tagline: string;
   description: string;
@@ -69,8 +66,6 @@ export interface Vendor {
   status: 'ACTIVE' | 'SUSPENDED';
   commissionPercent: number;
   legalBusinessName: string | null;
-  /** Printed on the vendor's tax invoices. */
-  gstin: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   /** Created directly with Razorpay, outside this app — see backend vendors.service.js. */
@@ -116,17 +111,11 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  gstRate: number | null;
-  hsnCode: string | null;
 }
 
 export interface OrderDetail extends OrderSummary {
   subtotal: number;
   discount: number;
-  /** Delivery fee charged — the platform's, not the vendor's. */
-  shipping: number;
-  /** GST already included in the prices, split out by rate. */
-  tax: { total: number; lines: { rate: number; taxable: number; tax: number }[] };
   vendorAmount: number;
   platformAmount: number;
   acceptedAt: string | null;
@@ -150,6 +139,8 @@ export interface OrderDetail extends OrderSummary {
   returnableUntil: string | null;
   refunds: { amount: number; status: string; reason: string | null; createdAt: string }[];
   returns: ReturnRequest[];
+  /** Admin detail only: what can still be credited back to the customer's wallet. */
+  refundable?: number;
 }
 
 export interface AdminOrderSummary extends OrderSummary {
@@ -323,6 +314,8 @@ export interface CustomerSummary {
 }
 
 export interface CustomerDetail extends CustomerSummary {
+  /** Store credit from refunds. */
+  walletBalance: number;
   addresses: {
     id: string;
     name: string;
@@ -412,7 +405,7 @@ export interface ReturnRequest {
   /** Shown to the customer with the decision. */
   adminNote: string | null;
   refundAmount: number | null;
-  /** Gateway refund outcome; `manual` for COD (pay back outside the gateway). */
+  /** `credited` (to the wallet), or `none` when the order was already refunded in full. */
   refundStatus: string | null;
   restocked: boolean;
   createdAt: string;
@@ -434,39 +427,18 @@ export interface AdminReturnRequest extends ReturnRequest {
   suggestedRefund?: number;
 }
 
+/** A refund credited to a customer's wallet. */
 export interface AdminRefund {
   id: string;
-  razorpayRefundId: string;
-  providerPaymentId: string | null;
-  orderId: string;
-  orderNumber: string;
-  customer: string | null;
   amount: number;
-  status: 'pending' | 'processed' | 'failed';
-  reason: string | null;
+  balanceAfter: number;
+  type: 'REFUND';
+  reason: string;
+  order: { id: string; orderNumber: string } | null;
+  customer: string | null;
+  /** Issued by staff (manual refund) rather than by a cancellation or return. */
+  manual: boolean;
   createdAt: string;
-}
-
-interface IssueOrder {
-  id: string;
-  orderNumber: string;
-  status: OrderStatus;
-  paymentMethod: 'ONLINE' | 'COD';
-  totalAmount: number;
-}
-
-export interface ShippingIssues {
-  /** Parcels the courier reported as RTO (coming back) or failed. */
-  shipments: {
-    id: string;
-    status: 'RTO' | 'FAILED';
-    awbNumber: string | null;
-    lastEvent: { status: string; description: string | null; occurredAt: string } | null;
-    order: IssueOrder;
-    createdAt: string;
-  }[];
-  /** Paid orders whose Shiprocket booking failed — retry them. */
-  unbooked: (IssueOrder & { createdAt: string })[];
 }
 
 /** An admin broadcast to every active customer. */
@@ -479,22 +451,4 @@ export interface NotificationCampaign {
   pushSent: number;
   pushFailed: number;
   createdAt: string;
-}
-
-/** Delivery fee rules. Empty slabs = free delivery. */
-export interface ShippingRules {
-  freeShippingAbove: number | null;
-  /** Ascending; the first slab a parcel fits in applies, heavier than all → the last. */
-  shippingSlabs: { upToKg: number; fee: number }[];
-  updatedAt: string;
-}
-
-export interface CourierRate {
-  courierId: number;
-  name: string;
-  rate: number;
-  estimatedDays: number | null;
-  estimatedDelivery: string | null;
-  cod: boolean;
-  recommended: boolean;
 }

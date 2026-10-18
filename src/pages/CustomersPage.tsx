@@ -191,7 +191,8 @@ function CustomerModal({ id, onClose, onChanged }: { id: string; onClose: () => 
                 <h3 className="text-base font-bold text-ink-900">{customer.name ?? 'Unnamed customer'}</h3>
                 <p className="text-sm text-ink-500">{[customer.phone, customer.email].filter(Boolean).join(' · ')}</p>
                 <p className="mt-1 text-xs text-ink-300">
-                  Joined {formatDate(customer.createdAt)} · {customer.orderCount} orders · {formatMoney(customer.totalSpent)} spent
+                  Joined {formatDate(customer.createdAt)} · {customer.orderCount} orders · {formatMoney(customer.totalSpent)} spent ·{' '}
+                  {formatMoney(customer.walletBalance)} in wallet
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-2">

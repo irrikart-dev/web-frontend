@@ -13,7 +13,6 @@ interface FormState {
   ownerEmail: string;
   commissionPercent: string;
   legalBusinessName: string;
-  gstin: string;
   contactEmail: string;
   contactPhone: string;
   razorpayAccountId: string;
@@ -24,7 +23,6 @@ const EMPTY: FormState = {
   ownerEmail: '',
   commissionPercent: '10',
   legalBusinessName: '',
-  gstin: '',
   contactEmail: '',
   contactPhone: '',
   razorpayAccountId: '',
@@ -253,7 +251,6 @@ function VendorForm({
           ownerEmail: '',
           commissionPercent: String(vendor.commissionPercent),
           legalBusinessName: vendor.legalBusinessName ?? '',
-          gstin: vendor.gstin ?? '',
           contactEmail: vendor.contactEmail ?? '',
           contactPhone: vendor.contactPhone ?? '',
           razorpayAccountId: vendor.razorpayAccountId ?? '',
@@ -279,7 +276,6 @@ function VendorForm({
               storeName: form.storeName.trim(),
               commissionPercent: Number(form.commissionPercent),
               legalBusinessName: form.legalBusinessName.trim() || undefined,
-              gstin: form.gstin.trim() || null,
               contactEmail: form.contactEmail.trim() || undefined,
               contactPhone: form.contactPhone.trim() || undefined,
               razorpayAccountId: form.razorpayAccountId.trim() || null,
@@ -292,7 +288,6 @@ function VendorForm({
               ownerEmail: form.ownerEmail.trim(),
               commissionPercent: Number(form.commissionPercent),
               legalBusinessName: form.legalBusinessName.trim() || undefined,
-              gstin: form.gstin.trim() || undefined,
               contactEmail: form.contactEmail.trim() || undefined,
               contactPhone: form.contactPhone.trim() || undefined,
               razorpayAccountId: form.razorpayAccountId.trim(),
@@ -355,15 +350,6 @@ function VendorForm({
             className="field"
             value={form.legalBusinessName}
             onChange={(e) => set('legalBusinessName', e.target.value)}
-          />
-        </Field>
-        <Field label="GSTIN" hint="Printed on this seller's invoices.">
-          <input
-            className="field font-mono uppercase"
-            maxLength={15}
-            pattern="[0-9A-Za-z]{15}"
-            value={form.gstin}
-            onChange={(e) => set('gstin', e.target.value)}
           />
         </Field>
       </div>

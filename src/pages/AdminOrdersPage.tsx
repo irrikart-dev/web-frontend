@@ -216,10 +216,8 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
         body: JSON.stringify(body),
       });
       setOrder(res.data);
-      if (res.data.refundStatus === 'failed') {
-        setNotice('Order cancelled, but the refund failed — retry it with Refund below.');
-      } else if (res.data.refundStatus) {
-        setNotice(`Order cancelled and refund ${res.data.refundStatus}.`);
+      if (res.data.refundStatus === 'credited') {
+        setNotice("Order cancelled and the amount paid credited to the customer's wallet.");
       }
       onChanged();
     } catch (e) {
@@ -230,11 +228,8 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
   }
 
   const next = order ? NEXT[order.status] : undefined;
-  // what's left to give back on the captured online payment, if any
-  const captured = order?.payments.find((p) => p.status === 'CAPTURED');
-  const refundable = captured
-    ? captured.amount - captured.refunds.filter((r) => r.status !== 'failed').reduce((n, r) => n + r.amount, 0)
-    : 0;
+  // what's left to credit back to the customer's wallet, if anything
+  const refundable = order?.refundable ?? 0;
   const canRefund = refundable > 0 && canAccess(user, 'payments');
 
   return (
@@ -320,7 +315,7 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
                 onSubmit={async (amount, reason) => {
                   await api(`/admin/refunds`, { method: 'POST', body: JSON.stringify({ orderId: id, amount, reason }) });
                   setRefunding(false);
-                  setNotice(`Refund of ${formatMoney(amount)} sent to the gateway.`);
+                  setNotice(`${formatMoney(amount)} credited to the customer's wallet.`);
                   reload();
                   onChanged();
                 }}
@@ -377,7 +372,7 @@ function AdminOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =
   );
 }
 
-/** Manual full or partial refund of the order's online payment. */
+/** Manual full or partial refund, credited to the customer's wallet. */
 function RefundForm({
   max,
   onSubmit,
@@ -427,13 +422,13 @@ function RefundForm({
           />
         </div>
       </div>
-      <p className="text-xs text-ink-500">Up to {formatMoney(max)} is left to refund. The money goes back to the customer's original payment method.</p>
+      <p className="text-xs text-ink-500">Up to {formatMoney(max)} is left to refund. It's added to the customer's IrriKart wallet as store credit.</p>
       <div className="flex justify-end gap-2">
         <button type="button" className="btn-ghost" onClick={onCancel}>
           Back
         </button>
         <button className="btn-primary" disabled={busy || !valid}>
-          {busy ? '...' : `Refund ${valid ? formatMoney(value) : ''}`}
+          {busy ? '...' : `Credit ${valid ? formatMoney(value) : ''} to wallet`}
         </button>
       </div>
     </form>

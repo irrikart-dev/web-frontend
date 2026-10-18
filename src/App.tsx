@@ -26,7 +26,6 @@ import { ProductsPage } from './pages/ProductsPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { ReviewsPage } from './pages/ReviewsPage';
 import { RfqPage } from './pages/RfqPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { StaffPage } from './pages/StaffPage';
 import { VendorDashboardPage } from './pages/VendorDashboardPage';
 import { VendorOrdersPage } from './pages/VendorOrdersPage';
@@ -37,6 +36,10 @@ const WIP = {
   reports: [
     'Reports',
     'Revenue, best sellers, category performance and stock movement over time.',
+  ],
+  settings: [
+    'Settings',
+    'Store details, tax and shipping rules, payment gateways and admin user management.',
   ],
 } as const;
 
@@ -116,7 +119,6 @@ function AdminApp() {
             {can('adminOnly') && <Route path="/customers" element={<CustomersPage />} />}
             {can('adminOnly') && <Route path="/promotions" element={<PromotionsPage />} />}
             {can('adminOnly') && <Route path="/notifications" element={<NotificationsPage />} />}
-            {can('adminOnly') && <Route path="/settings" element={<SettingsPage />} />}
             {can('adminOnly') && Object.entries(WIP).map(([path, [title, blurb]]) => (
               <Route
                 key={path}

@@ -48,7 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/vendors', label: 'Vendors', icon: IconUsers, wip: false, group: 'Commerce', permission: 'vendors' },
   { to: '/orders', label: 'Orders', icon: IconCart, wip: false, group: 'Commerce', permission: 'orders' },
   { to: '/rfq', label: 'Quote Requests', icon: IconEdit, wip: false, group: 'Commerce', permission: 'orders' },
-  { to: '/returns', label: 'Returns & Shipping', icon: IconReturn, wip: false, group: 'Commerce', permission: 'orders' },
+  { to: '/returns', label: 'Returns', icon: IconReturn, wip: false, group: 'Commerce', permission: 'orders' },
   { to: '/payments', label: 'Payments', icon: IconCard, wip: false, group: 'Commerce', permission: 'payments' },
   { to: '/refunds', label: 'Refunds', icon: IconCard, wip: false, group: 'Commerce', permission: 'payments' },
   { to: '/customers', label: 'Customers', icon: IconUsers, wip: false, group: 'Commerce', permission: 'adminOnly' },
@@ -56,7 +56,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/notifications', label: 'Notifications', icon: IconBell, wip: false, group: 'Commerce', permission: 'adminOnly' },
   { to: '/reports', label: 'Reports', icon: IconChart, wip: true, group: 'Insights', permission: 'adminOnly' },
   { to: '/staff', label: 'Staff & Roles', icon: IconShield, wip: false, group: 'Insights', permission: 'adminOnly' },
-  { to: '/settings', label: 'Settings', icon: IconCog, wip: false, group: 'Insights', permission: 'adminOnly' },
+  { to: '/settings', label: 'Settings', icon: IconCog, wip: true, group: 'Insights', permission: 'adminOnly' },
 ];
 
 /** What a VENDOR-role user sees instead of NAV_ITEMS — a vendor only ever manages
