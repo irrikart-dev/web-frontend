@@ -19,6 +19,8 @@ import { TermsPage } from './pages/legal/TermsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductFormPage } from './pages/ProductFormPage';
 import { PaymentsPage } from './pages/PaymentsPage';
+import { RefundsPage } from './pages/RefundsPage';
+import { ReturnsPage } from './pages/ReturnsPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { ReviewsPage } from './pages/ReviewsPage';
@@ -109,7 +111,9 @@ function AdminApp() {
             {can('vendors') && <Route path="/vendors" element={<AdminVendorsPage />} />}
             {can('orders') && <Route path="/orders" element={<AdminOrdersPage />} />}
             {can('orders') && <Route path="/rfq" element={<RfqPage />} />}
+            {can('orders') && <Route path="/returns" element={<ReturnsPage />} />}
             {can('payments') && <Route path="/payments" element={<PaymentsPage />} />}
+            {can('payments') && <Route path="/refunds" element={<RefundsPage />} />}
             {can('adminOnly') && <Route path="/staff" element={<StaffPage />} />}
             {can('adminOnly') && <Route path="/customers" element={<CustomersPage />} />}
             {can('adminOnly') && <Route path="/promotions" element={<PromotionsPage />} />}

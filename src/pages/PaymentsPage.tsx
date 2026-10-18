@@ -189,7 +189,7 @@ export function PaymentsPage() {
   );
 }
 
-function Tile({ label, value, hint, alert }: { label: string; value: string; hint: string; alert?: boolean }) {
+export function Tile({ label, value, hint, alert }: { label: string; value: string; hint: string; alert?: boolean }) {
   return (
     <div className={`card p-4 ${alert ? 'border-red-200 bg-red-50' : ''}`}>
       <p className="text-xs font-semibold tracking-wide text-ink-500 uppercase">{label}</p>

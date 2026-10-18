@@ -134,6 +134,11 @@ export interface OrderDetail extends OrderSummary {
   } | null;
   /** Set on cancel responses: how the refund went (null when nothing to refund). */
   refundStatus?: string | null;
+  deliveredAt: string | null;
+  /** Last day the customer can ask for a return; null unless DELIVERED. */
+  returnableUntil: string | null;
+  refunds: { amount: number; status: string; reason: string | null; createdAt: string }[];
+  returns: ReturnRequest[];
 }
 
 export interface AdminOrderSummary extends OrderSummary {
@@ -374,4 +379,73 @@ export interface Banner {
   imageUrl: string | null;
   position: number;
   active: boolean;
+}
+
+export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
+
+export interface ReturnRequest {
+  id: string;
+  type: 'RETURN' | 'REPLACE';
+  status: ReturnStatus;
+  reason: string;
+  details: string | null;
+  photoUrls: string[];
+  /** Shown to the customer with the decision. */
+  adminNote: string | null;
+  refundAmount: number | null;
+  /** Gateway refund outcome; `manual` for COD (pay back outside the gateway). */
+  refundStatus: string | null;
+  restocked: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  items: { orderItemId: string; quantity: number; name: string; sku: string; image: string | null }[];
+}
+
+export interface AdminReturnRequest extends ReturnRequest {
+  order: {
+    id: string;
+    orderNumber: string;
+    status: OrderStatus;
+    paymentMethod: 'ONLINE' | 'COD';
+    totalAmount: number;
+    deliveredAt: string | null;
+  };
+  customer: { name: string | null; phone: string | null; email: string | null };
+  /** Detail only: the returned lines' pro-rata share of what was paid. */
+  suggestedRefund?: number;
+}
+
+export interface AdminRefund {
+  id: string;
+  razorpayRefundId: string;
+  providerPaymentId: string | null;
+  orderId: string;
+  orderNumber: string;
+  customer: string | null;
+  amount: number;
+  status: 'pending' | 'processed' | 'failed';
+  reason: string | null;
+  createdAt: string;
+}
+
+interface IssueOrder {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  paymentMethod: 'ONLINE' | 'COD';
+  totalAmount: number;
+}
+
+export interface ShippingIssues {
+  /** Parcels the courier reported as RTO (coming back) or failed. */
+  shipments: {
+    id: string;
+    status: 'RTO' | 'FAILED';
+    awbNumber: string | null;
+    lastEvent: { status: string; description: string | null; occurredAt: string } | null;
+    order: IssueOrder;
+    createdAt: string;
+  }[];
+  /** Paid orders whose Shiprocket booking failed — retry them. */
+  unbooked: (IssueOrder & { createdAt: string })[];
 }
