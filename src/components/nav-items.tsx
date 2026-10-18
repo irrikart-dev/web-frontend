@@ -56,7 +56,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/notifications', label: 'Notifications', icon: IconBell, wip: false, group: 'Commerce', permission: 'adminOnly' },
   { to: '/reports', label: 'Reports', icon: IconChart, wip: true, group: 'Insights', permission: 'adminOnly' },
   { to: '/staff', label: 'Staff & Roles', icon: IconShield, wip: false, group: 'Insights', permission: 'adminOnly' },
-  { to: '/settings', label: 'Settings', icon: IconCog, wip: true, group: 'Insights', permission: 'adminOnly' },
+  { to: '/settings', label: 'Settings', icon: IconCog, wip: false, group: 'Insights', permission: 'adminOnly' },
 ];
 
 /** What a VENDOR-role user sees instead of NAV_ITEMS — a vendor only ever manages

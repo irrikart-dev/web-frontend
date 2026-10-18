@@ -40,6 +40,9 @@ export interface Product {
   images: string[];
   galleryImages: GalleryImage[];
   videoUrl: string | null;
+  /** GST % included in the price; null = not set. */
+  gstRate: number | null;
+  hsnCode: string | null;
   variants: ProductVariant[];
   tagline: string;
   description: string;
@@ -66,6 +69,8 @@ export interface Vendor {
   status: 'ACTIVE' | 'SUSPENDED';
   commissionPercent: number;
   legalBusinessName: string | null;
+  /** Printed on the vendor's tax invoices. */
+  gstin: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   /** Created directly with Razorpay, outside this app — see backend vendors.service.js. */
@@ -111,11 +116,17 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  gstRate: number | null;
+  hsnCode: string | null;
 }
 
 export interface OrderDetail extends OrderSummary {
   subtotal: number;
   discount: number;
+  /** Delivery fee charged — the platform's, not the vendor's. */
+  shipping: number;
+  /** GST already included in the prices, split out by rate. */
+  tax: { total: number; lines: { rate: number; taxable: number; tax: number }[] };
   vendorAmount: number;
   platformAmount: number;
   acceptedAt: string | null;
@@ -468,4 +479,22 @@ export interface NotificationCampaign {
   pushSent: number;
   pushFailed: number;
   createdAt: string;
+}
+
+/** Delivery fee rules. Empty slabs = free delivery. */
+export interface ShippingRules {
+  freeShippingAbove: number | null;
+  /** Ascending; the first slab a parcel fits in applies, heavier than all → the last. */
+  shippingSlabs: { upToKg: number; fee: number }[];
+  updatedAt: string;
+}
+
+export interface CourierRate {
+  courierId: number;
+  name: string;
+  rate: number;
+  estimatedDays: number | null;
+  estimatedDelivery: string | null;
+  cod: boolean;
+  recommended: boolean;
 }

@@ -34,6 +34,9 @@ interface FormState {
   description: string;
   unit: string;
   price: string;
+  /** GST % included in the price; blank = not set. */
+  gstRate: string;
+  hsnCode: string;
   stockQty: string;
   imageUrl: string;
   videoUrl: string;
@@ -53,6 +56,8 @@ const EMPTY: FormState = {
   description: '',
   unit: 'piece',
   price: '',
+  gstRate: '',
+  hsnCode: '',
   stockQty: '0',
   imageUrl: '',
   videoUrl: '',
@@ -150,6 +155,8 @@ export function ProductFormPage() {
           description: p.description,
           unit: p.unit,
           price: String(p.price),
+          gstRate: p.gstRate == null ? '' : String(p.gstRate),
+          hsnCode: p.hsnCode ?? '',
           stockQty: String(p.stockQty),
           imageUrl: p.imageUrl ?? '',
           videoUrl: p.videoUrl ?? '',
@@ -289,6 +296,8 @@ export function ProductFormPage() {
       description: form.description.trim(),
       unit: form.unit,
       price: Number(form.price),
+      gstRate: form.gstRate === '' ? null : Number(form.gstRate),
+      hsnCode: form.hsnCode.trim() || null,
       stockQty: Number(form.stockQty),
       imageUrl,
       videoUrl: form.videoUrl.trim() || null,
@@ -493,6 +502,36 @@ export function ProductFormPage() {
                 ))}
               </select>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="GST %" error={fieldErrors.gstRate} hint="Included in the price.">
+                <input
+                  className="field"
+                  type="number"
+                  min={0}
+                  max={40}
+                  step="0.01"
+                  list="gst-rates"
+                  placeholder="Not set"
+                  value={form.gstRate}
+                  onChange={(e) => set('gstRate', e.target.value)}
+                />
+                <datalist id="gst-rates">
+                  {[0, 5, 18, 40].map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="HSN code" error={fieldErrors.hsnCode}>
+                <input
+                  className="field"
+                  inputMode="numeric"
+                  pattern="[0-9]{4,8}"
+                  placeholder="e.g. 8424"
+                  value={form.hsnCode}
+                  onChange={(e) => set('hsnCode', e.target.value)}
+                />
+              </Field>
+            </div>
           </section>
 
           <section className="card space-y-4 p-5">
