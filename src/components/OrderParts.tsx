@@ -106,6 +106,12 @@ export function OrderBody({ order }: { order: OrderDetail }) {
           <dt>Total</dt>
           <dd>{formatMoney(order.amount)}</dd>
         </div>
+        {order.tax?.lines.map((t) => (
+          <div key={t.rate} className="flex justify-between text-xs text-ink-500">
+            <dt>Incl. GST {t.rate}%</dt>
+            <dd>₹{t.tax.toFixed(2)}</dd>
+          </div>
+        ))}
         <div className="flex justify-between text-xs text-ink-500">
           <dt>Seller share / commission</dt>
           <dd>

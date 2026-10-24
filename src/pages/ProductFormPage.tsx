@@ -34,6 +34,9 @@ interface FormState {
   description: string;
   unit: string;
   price: string;
+  /** GST % included in the price; blank = not set. */
+  gstRate: string;
+  hsnCode: string;
   stockQty: string;
   imageUrl: string;
   videoUrl: string;
@@ -53,6 +56,8 @@ const EMPTY: FormState = {
   description: '',
   unit: 'piece',
   price: '',
+  gstRate: '',
+  hsnCode: '',
   stockQty: '0',
   imageUrl: '',
   videoUrl: '',
@@ -150,6 +155,8 @@ export function ProductFormPage() {
           description: p.description,
           unit: p.unit,
           price: String(p.price),
+          gstRate: p.gstRate == null ? '' : String(p.gstRate),
+          hsnCode: p.hsnCode ?? '',
           stockQty: String(p.stockQty),
           imageUrl: p.imageUrl ?? '',
           videoUrl: p.videoUrl ?? '',
@@ -206,12 +213,7 @@ export function ProductFormPage() {
     }
   }
 
-  async function addVariant(input: {
-    size: string;
-    unit: string;
-    price: string;
-    stockQty: string;
-  }) {
+  async function addVariant(input: VariantDraft) {
     if (!id) return;
     setVariantError(null);
     try {
@@ -221,7 +223,9 @@ export function ProductFormPage() {
           size: input.size.trim() || undefined,
           unit: input.unit,
           price: Number(input.price),
-          stockQty: Number(input.stockQty) || 0,
+          ...(input.packOfId
+            ? { packOfId: input.packOfId, unitsPerPack: Number(input.unitsPerPack) }
+            : { stockQty: Number(input.stockQty) || 0 }),
         }),
       });
       await reloadExisting();
@@ -289,6 +293,8 @@ export function ProductFormPage() {
       description: form.description.trim(),
       unit: form.unit,
       price: Number(form.price),
+      gstRate: form.gstRate === '' ? null : Number(form.gstRate),
+      hsnCode: form.hsnCode.trim() || null,
       stockQty: Number(form.stockQty),
       imageUrl,
       videoUrl: form.videoUrl.trim() || null,
@@ -393,7 +399,7 @@ export function ProductFormPage() {
                 >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.label ?? c.name}
                     </option>
                   ))}
                 </select>
@@ -493,6 +499,36 @@ export function ProductFormPage() {
                 ))}
               </select>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="GST %" error={fieldErrors.gstRate} hint="Included in the price.">
+                <input
+                  className="field"
+                  type="number"
+                  min={0}
+                  max={40}
+                  step="0.01"
+                  list="gst-rates"
+                  placeholder="Not set"
+                  value={form.gstRate}
+                  onChange={(e) => set('gstRate', e.target.value)}
+                />
+                <datalist id="gst-rates">
+                  {[0, 5, 18, 40].map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="HSN code" error={fieldErrors.hsnCode}>
+                <input
+                  className="field"
+                  inputMode="numeric"
+                  pattern="[0-9]{4,8}"
+                  placeholder="e.g. 8424"
+                  value={form.hsnCode}
+                  onChange={(e) => set('hsnCode', e.target.value)}
+                />
+              </Field>
+            </div>
           </section>
 
           <section className="card space-y-4 p-5">
@@ -683,6 +719,16 @@ function GallerySection({
   );
 }
 
+interface VariantDraft {
+  size: string;
+  unit: string;
+  price: string;
+  stockQty: string;
+  /** '' = keeps its own stock; else the variant this one is a pack of */
+  packOfId: string;
+  unitsPerPack: string;
+}
+
 /** Size/pack options beyond the primary variant created with the product. */
 function VariantsSection({
   variants,
@@ -695,19 +741,26 @@ function VariantsSection({
   variants: ProductVariant[];
   units: string[];
   error: string | null;
-  onAdd: (input: { size: string; unit: string; price: string; stockQty: string }) => Promise<void>;
+  onAdd: (input: VariantDraft) => Promise<void>;
   onSave: (variantId: string, patch: Partial<ProductVariant>) => Promise<void>;
   onDelete: (variantId: string) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState({ size: '', unit: units[0] ?? 'piece', price: '', stockQty: '0' });
+  const empty: VariantDraft = { size: '', unit: units[0] ?? 'piece', price: '', stockQty: '0', packOfId: '', unitsPerPack: '' };
+  const [draft, setDraft] = useState<VariantDraft>(empty);
   const [busy, setBusy] = useState(false);
+  // a pack draws on a variant with its own stock — never on another pack
+  const packable = variants.filter((v) => !v.packOf);
+  const label = (v: ProductVariant) => [v.size, v.unit, v.sku].filter(Boolean).join(' · ');
+  const draftValid =
+    !!draft.price && (!draft.packOfId || (Number.isInteger(Number(draft.unitsPerPack)) && Number(draft.unitsPerPack) >= 2));
 
   return (
     <section className="card space-y-4 p-5">
       <h3 className="text-sm font-bold text-ink-900">Variants</h3>
       <p className="-mt-2 text-xs text-ink-500">
         Size/pack options the app shows as a selector. The first variant is the default shown
-        everywhere else and can't be deleted.
+        everywhere else and can't be deleted. A pack (a dozen, a carton) has its own price and
+        takes its units from another variant's stock.
       </p>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="space-y-2">
@@ -756,24 +809,54 @@ function VariantsSection({
             onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
           />
         </div>
-        <div className="w-24">
-          <label className="label">Stock</label>
-          <input
+        <div className="w-44">
+          <label className="label">Stock from</label>
+          <select
             className="field"
-            type="number"
-            min={0}
-            value={draft.stockQty}
-            onChange={(e) => setDraft((d) => ({ ...d, stockQty: e.target.value }))}
-          />
+            value={draft.packOfId}
+            onChange={(e) => setDraft((d) => ({ ...d, packOfId: e.target.value }))}
+          >
+            <option value="">Its own stock</option>
+            {packable.map((v) => (
+              <option key={v.id} value={v.id}>
+                Pack of {label(v)}
+              </option>
+            ))}
+          </select>
         </div>
+        {draft.packOfId ? (
+          <div className="w-24">
+            <label className="label">Units/pack</label>
+            <input
+              className="field"
+              type="number"
+              min={2}
+              step={1}
+              value={draft.unitsPerPack}
+              onChange={(e) => setDraft((d) => ({ ...d, unitsPerPack: e.target.value }))}
+              placeholder="12"
+            />
+          </div>
+        ) : (
+          <div className="w-24">
+            <label className="label">Stock</label>
+            <input
+              className="field"
+              type="number"
+              min={0}
+              value={draft.stockQty}
+              onChange={(e) => setDraft((d) => ({ ...d, stockQty: e.target.value }))}
+            />
+          </div>
+        )}
         <button
           type="button"
           className="btn-ghost px-3"
-          disabled={busy || !draft.price}
+          disabled={busy || !draftValid}
           onClick={async () => {
             setBusy(true);
             await onAdd(draft);
-            setDraft({ size: '', unit: units[0] ?? 'piece', price: '', stockQty: '0' });
+            setDraft(empty);
             setBusy(false);
           }}
         >
@@ -827,22 +910,34 @@ function VariantRow({
       <div className="w-24">
         <input className="field" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
       </div>
-      <div className="w-24">
-        <input
-          className="field"
-          type="number"
-          min={0}
-          value={stockQty}
-          onChange={(e) => setStockQty(e.target.value)}
-        />
-      </div>
+      {variant.packOf ? (
+        // a pack's stock is the base variant's — it can't be set here
+        <p className="w-44 pb-2 text-xs text-ink-500" title={`${variant.available} pack(s) can be filled now`}>
+          {variant.unitsPerPack} × {variant.packOf.unit} · {variant.available} available
+        </p>
+      ) : (
+        <div className="w-24">
+          <input
+            className="field"
+            type="number"
+            min={0}
+            value={stockQty}
+            onChange={(e) => setStockQty(e.target.value)}
+          />
+        </div>
+      )}
       <button
         type="button"
         className="btn-ghost px-3"
         disabled={!dirty || busy}
         onClick={async () => {
           setBusy(true);
-          await onSave({ size: size.trim() || undefined, unit, price: Number(price), stockQty: Number(stockQty) });
+          await onSave({
+            size: size.trim() || undefined,
+            unit,
+            price: Number(price),
+            ...(variant.packOf ? {} : { stockQty: Number(stockQty) }),
+          });
           setBusy(false);
         }}
       >

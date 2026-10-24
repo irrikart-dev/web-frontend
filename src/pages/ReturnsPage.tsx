@@ -5,7 +5,7 @@ import { IconSearch } from '../components/icons';
 import { Modal } from '../components/Modal';
 import { OrderStatusBadge } from '../components/OrderParts';
 import { ApiError, api, resolveAssetUrl } from '../lib/api';
-import { formatDate } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import type { AdminReturnRequest, Paged, ReturnStatus } from '../lib/types';
 
 const LIMIT = 25;
@@ -25,7 +25,7 @@ const STATUS_STYLE: Record<ReturnStatus, string> = {
 
 const customerLabel = (c: AdminReturnRequest['customer']) => c.name ?? c.phone ?? c.email ?? 'Customer';
 
-/** Customer returns and replacements. Completing one restocks the items; refunds are settled outside the app. */
+/** Customer returns and replacements. Completing a return restocks the items and refunds the customer. */
 export function ReturnsPage() {
   const [data, setData] = useState<Paged<AdminReturnRequest> | null>(null);
   const [status, setStatus] = useState('REQUESTED');
@@ -172,10 +172,14 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [restock, setRestock] = useState(true);
+  const [refund, setRefund] = useState('');
 
   useEffect(() => {
     api<{ data: AdminReturnRequest }>(`/admin/returns/${id}`)
-      .then((res) => setR(res.data))
+      .then((res) => {
+        setR(res.data);
+        setRefund(String(res.data.suggestedRefund ?? 0));
+      })
       .catch((e) => setError((e as Error).message));
   }, [id]);
 
@@ -184,7 +188,7 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
     setError(null);
     const body =
       action === 'complete'
-        ? { restock, note: note.trim() || undefined }
+        ? { restock, note: note.trim() || undefined, ...(r?.type === 'RETURN' ? { refundAmount: Number(refund) || 0 } : {}) }
         : { note: note.trim() || undefined };
     try {
       const res = await api<{ data: AdminReturnRequest }>(`/admin/returns/${id}/${action}`, {
@@ -266,7 +270,12 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
             {r.status === 'COMPLETED' && (
               <p className="rounded-lg border border-ink-100 bg-ink-50 px-4 py-3 text-sm text-ink-700">
                 {r.restocked ? 'Restocked. ' : 'Not restocked. '}
-                No refund is issued in the app — settle it with the customer.
+                {r.refundAmount != null
+                  ? r.refundStatus === 'manual'
+                    ? `${formatMoney(r.refundAmount)} to pay back by hand (COD order).`
+                    : `${formatMoney(r.refundAmount)} refund ${r.refundStatus}.`
+                  : 'No refund.'}
+                {r.refundStatus === 'failed' && ' Retry it with a manual refund from the order.'}
               </p>
             )}
             {r.adminNote && !open && <p className="text-sm text-ink-500">Note to customer: {r.adminNote}</p>}
@@ -276,7 +285,19 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
                 <Field label="Note to customer" hint="Required to reject. Shown in the app with your decision.">
                   <textarea className="field min-h-20" maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
                 </Field>
-                <Toggle label="Put items back in stock" hint="Untick for damaged goods." checked={restock} onChange={setRestock} />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {r.type === 'RETURN' && (
+                    <Field
+                      label="Refund (₹)"
+                      hint={`Suggested ${formatMoney(r.suggestedRefund ?? 0)} — the items' share of what was paid.`}
+                    >
+                      <input className="field" type="number" min={0} value={refund} onChange={(e) => setRefund(e.target.value)} />
+                    </Field>
+                  )}
+                  <div className="pt-6">
+                    <Toggle label="Put items back in stock" hint="Untick for damaged goods." checked={restock} onChange={setRestock} />
+                  </div>
+                </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <button className="btn-danger" disabled={busy || note.trim().length < 3} onClick={() => act('reject')}>
                     Reject
@@ -287,7 +308,7 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
                     </button>
                   )}
                   <button className="btn-primary" disabled={busy} onClick={() => act('complete')}>
-                    {busy ? '...' : 'Goods received — close'}
+                    {busy ? '...' : r.type === 'RETURN' ? 'Goods received — refund' : 'Goods received — close'}
                   </button>
                 </div>
               </section>

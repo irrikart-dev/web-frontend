@@ -5,7 +5,7 @@ import { IconEdit, IconPlus, IconSearch, IconTrash } from '../components/icons';
 import { api, imageSrc } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { getBrands } from '../lib/brands';
-import { getCategories } from '../lib/categories';
+import { getCategories, inCategory } from '../lib/categories';
 import { formatMoney } from '../lib/format';
 import type { Brand, Category, Product, ProductStatus } from '../lib/types';
 
@@ -75,16 +75,16 @@ export function ProductsPage() {
     const q = search.trim().toLowerCase();
     return products.filter(
       (p) =>
-        (!categoryFilter || p.category === categoryFilter) &&
+        (!categoryFilter || inCategory(p.category, categoryFilter, categories)) &&
         (!statusFilter || p.status === statusFilter) &&
         (!q ||
           p.name.toLowerCase().includes(q) ||
           p.sku.toLowerCase().includes(q) ||
           p.slug.includes(q)),
     );
-  }, [products, search, categoryFilter, statusFilter]);
+  }, [products, search, categoryFilter, statusFilter, categories]);
 
-  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
+  const categoryName = (id: string) => categories.find((c) => c.id === id)?.label ?? id;
 
   async function changeStatus(product: Product, status: ProductStatus) {
     try {
@@ -155,7 +155,7 @@ export function ProductsPage() {
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.label ?? c.name}
             </option>
           ))}
         </select>
@@ -488,7 +488,7 @@ function BulkBar({
         <option value="">Move to category...</option>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.name}
+            {c.label ?? c.name}
           </option>
         ))}
       </select>

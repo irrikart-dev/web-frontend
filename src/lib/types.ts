@@ -12,6 +12,9 @@ export interface ProductVariant {
   price: number;
   stockQty: number;
   available: number;
+  /** Set on a pack (e.g. a dozen): the variant whose stock it draws on, `unitsPerPack` at a time. */
+  packOf: { id: string; unit: string } | null;
+  unitsPerPack: number;
 }
 
 export interface GalleryImage {
@@ -40,6 +43,9 @@ export interface Product {
   images: string[];
   galleryImages: GalleryImage[];
   videoUrl: string | null;
+  /** GST % included in the price; null = not set. */
+  gstRate: number | null;
+  hsnCode: string | null;
   variants: ProductVariant[];
   tagline: string;
   description: string;
@@ -66,6 +72,8 @@ export interface Vendor {
   status: 'ACTIVE' | 'SUSPENDED';
   commissionPercent: number;
   legalBusinessName: string | null;
+  /** Printed on the vendor's tax invoices. */
+  gstin: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   /** Created directly with Razorpay, outside this app — see backend vendors.service.js. */
@@ -111,11 +119,17 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  gstRate: number | null;
+  hsnCode: string | null;
 }
 
 export interface OrderDetail extends OrderSummary {
   subtotal: number;
   discount: number;
+  /** GST already included in the prices, split out by rate. */
+  tax: { total: number; lines: { rate: number; taxable: number; tax: number }[] };
+  /** Money given back so far — cancellation, return or manual refund. */
+  refunds: { amount: number; status: string; reason: string | null; createdAt: string }[];
   vendorAmount: number;
   platformAmount: number;
   acceptedAt: string | null;
@@ -246,7 +260,12 @@ export interface Category {
   name: string;
   blurb: string;
   imageUrl: string | null;
+  /** null for a top-level category — sub-categories are one level deep */
+  parentId: string | null;
+  /** includes the sub-categories' products */
   productCount: number;
+  /** "Parent › Child" for a sub-category; set by getCategories() */
+  label?: string;
 }
 
 export interface AdminUser {
@@ -399,6 +418,9 @@ export interface ReturnRequest {
   photoUrls: string[];
   /** Shown to the customer with the decision. */
   adminNote: string | null;
+  refundAmount: number | null;
+  /** Gateway refund outcome; `manual` for COD (pay back outside the gateway). */
+  refundStatus: string | null;
   restocked: boolean;
   createdAt: string;
   resolvedAt: string | null;
@@ -415,6 +437,21 @@ export interface AdminReturnRequest extends ReturnRequest {
     deliveredAt: string | null;
   };
   customer: { name: string | null; phone: string | null; email: string | null };
+  /** Detail only: the returned lines' pro-rata share of what was paid. */
+  suggestedRefund?: number;
+}
+
+export interface AdminRefund {
+  id: string;
+  razorpayRefundId: string;
+  providerPaymentId: string | null;
+  orderId: string;
+  orderNumber: string;
+  customer: string | null;
+  amount: number;
+  status: 'pending' | 'processed' | 'failed';
+  reason: string | null;
+  createdAt: string;
 }
 
 /** An admin broadcast to every active customer. */

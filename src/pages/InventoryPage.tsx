@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IconSearch } from '../components/icons';
 import { Modal } from '../components/Modal';
 import { api, imageSrc } from '../lib/api';
-import { getCategories } from '../lib/categories';
+import { getCategories, inCategory } from '../lib/categories';
 import { formatDate } from '../lib/format';
 import type { Category, LedgerEntry, Product } from '../lib/types';
 
@@ -47,17 +47,17 @@ export function InventoryPage() {
     setProducts((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
   }, []);
 
-  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
+  const categoryName = (id: string) => categories.find((c) => c.id === id)?.label ?? id;
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter(
       (p) =>
-        (!categoryFilter || p.category === categoryFilter) &&
+        (!categoryFilter || inCategory(p.category, categoryFilter, categories)) &&
         (!lowStockOnly || p.stockQty < LOW_STOCK_THRESHOLD) &&
         (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)),
     );
-  }, [products, search, categoryFilter, lowStockOnly]);
+  }, [products, search, categoryFilter, lowStockOnly, categories]);
 
   const lowStockCount = useMemo(
     () => products.filter((p) => p.stockQty < LOW_STOCK_THRESHOLD).length,
@@ -84,7 +84,7 @@ export function InventoryPage() {
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.label ?? c.name}
             </option>
           ))}
         </select>

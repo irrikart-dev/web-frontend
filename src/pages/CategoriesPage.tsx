@@ -13,9 +13,10 @@ interface FormState {
   name: string;
   blurb: string;
   imageUrl: string;
+  parentId: string;
 }
 
-const EMPTY: FormState = { name: '', blurb: '', imageUrl: '' };
+const EMPTY: FormState = { name: '', blurb: '', imageUrl: '', parentId: '' };
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -85,15 +86,13 @@ export function CategoriesPage() {
           <CategoryForm
             key={editingId}
             category={editingId === 'new' ? null : categories.find((c) => c.id === editingId) ?? null}
+            categories={categories}
             onClose={() => setEditingId(null)}
             onSaved={(saved) => {
-              setCategories((rows) =>
-                rows.some((r) => r.id === saved.id)
-                  ? rows.map((r) => (r.id === saved.id ? saved : r))
-                  : [...rows, saved].sort((a, b) => a.name.localeCompare(b.name)),
-              );
               setEditingId(null);
               flash(editingId === 'new' ? `Added ${saved.name}` : `Saved ${saved.name}`);
+              // a move changes the tree order and both parents' product counts
+              void load();
             }}
           />
         </Modal>
@@ -126,10 +125,11 @@ export function CategoriesPage() {
               )}
               {categories.map((c) => {
                 const src = resolveAssetUrl(c.imageUrl);
+                const hasChildren = categories.some((child) => child.parentId === c.id);
                 return (
                   <tr key={c.id} className="hover:bg-ink-50/60">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                      <div className={`flex items-center gap-3 ${c.parentId ? 'pl-8' : ''}`}>
                         <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-ink-100 bg-white">
                           {src ? (
                             <img src={src} alt="" className="h-full w-full object-cover" />
@@ -140,7 +140,10 @@ export function CategoriesPage() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-ink-900">{c.name}</p>
+                          <p className="truncate font-semibold text-ink-900">
+                            {c.parentId && <span className="mr-1 text-ink-300">↳</span>}
+                            {c.name}
+                          </p>
                           <p className="truncate text-xs text-ink-300">{c.blurb}</p>
                         </div>
                       </div>
@@ -157,12 +160,14 @@ export function CategoriesPage() {
                         </button>
                         <button
                           onClick={() => remove(c)}
-                          disabled={c.productCount > 0}
+                          disabled={c.productCount > 0 || hasChildren}
                           className="rounded-lg p-2 text-ink-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
                           title={
                             c.productCount > 0
                               ? 'Move or delete its products first'
-                              : 'Delete category'
+                              : hasChildren
+                                ? 'Move or delete its sub-categories first'
+                                : 'Delete category'
                           }
                         >
                           <IconTrash width={17} height={17} />
@@ -182,18 +187,29 @@ export function CategoriesPage() {
 
 function CategoryForm({
   category,
+  categories,
   onClose,
   onSaved,
 }: {
   category: Category | null;
+  categories: Category[];
   onClose: () => void;
   onSaved: (c: Category) => void;
 }) {
   const [form, setForm] = useState<FormState>(
     category
-      ? { name: category.name, blurb: category.blurb, imageUrl: category.imageUrl ?? '' }
+      ? {
+          name: category.name,
+          blurb: category.blurb,
+          imageUrl: category.imageUrl ?? '',
+          parentId: category.parentId ?? '',
+        }
       : EMPTY,
   );
+  // one level deep: only top-level categories can be parents, and a category that
+  // already has sub-categories stays top-level
+  const parents = categories.filter((c) => !c.parentId && c.id !== category?.id);
+  const hasChildren = !!category && categories.some((c) => c.parentId === category.id);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +237,7 @@ function CategoryForm({
       name: form.name.trim(),
       blurb: form.blurb.trim(),
       imageUrl: form.imageUrl.trim() || null,
+      parentId: form.parentId || null,
     };
 
     try {
@@ -257,6 +274,25 @@ function CategoryForm({
           onChange={(e) => set('name', e.target.value)}
           required
         />
+      </Field>
+
+      <Field
+        label="Parent category"
+        hint={hasChildren ? 'This category has sub-categories, so it stays top-level.' : undefined}
+      >
+        <select
+          className="field"
+          value={form.parentId}
+          onChange={(e) => set('parentId', e.target.value)}
+          disabled={hasChildren}
+        >
+          <option value="">None — top-level category</option>
+          {parents.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </Field>
 
       <Field label="Description">

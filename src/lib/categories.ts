@@ -13,7 +13,7 @@ export async function getCategories(): Promise<Category[]> {
     // visibility flag), but this way it also works for the VENDOR role's product form
     inflight = api<{ data: Category[] }>('/catalog/categories', { auth: false })
       .then((res) => {
-        cache = res.data;
+        cache = treeOrder(res.data);
         return cache;
       })
       .finally(() => {
@@ -21,6 +21,26 @@ export async function getCategories(): Promise<Category[]> {
       });
   }
   return inflight;
+}
+
+/** Each top-level category followed by its sub-categories, with `label` set for dropdowns. */
+function treeOrder(rows: Category[]): Category[] {
+  const byId = new Map(rows.map((c) => [c.id, c]));
+  const isTop = (c: Category) => !c.parentId || !byId.has(c.parentId);
+  const out: Category[] = [];
+  for (const top of rows.filter(isTop)) {
+    out.push({ ...top, label: top.name });
+    for (const child of rows.filter((c) => c.parentId === top.id)) {
+      out.push({ ...child, label: `${top.name} › ${child.name}` });
+    }
+  }
+  return out;
+}
+
+/** A product filed under `filterId` or one of its sub-categories. */
+export function inCategory(productCategoryId: string, filterId: string, categories: Category[]) {
+  if (productCategoryId === filterId) return true;
+  return categories.find((c) => c.id === productCategoryId)?.parentId === filterId;
 }
 
 /** Call after any category create/update/delete so the next read is fresh. */
